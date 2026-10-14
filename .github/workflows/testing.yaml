@@ -88,9 +88,14 @@ jobs:
                 dirname "$(dirname "$test_file")"
               done | sort -u
           )
+          # Report independent submodule failures even when the root suite fails.
+          test_status=0
           for directory in "${test_directories[@]}"; do
-            "$TF_ENGINE" -chdir="$directory" test -no-color
+            if ! "$TF_ENGINE" -chdir="$directory" test -no-color; then
+              test_status=1
+            fi
           done
+          exit "$test_status"
 
   lint:
     runs-on: ubuntu-latest

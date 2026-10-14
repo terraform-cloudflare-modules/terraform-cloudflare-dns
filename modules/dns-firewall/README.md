@@ -14,7 +14,7 @@ module "dns_firewall" {
       name                   = "External authoritative DNS"
       upstream_ips           = ["192.0.2.1", "192.0.2.2"]
       dns_firewall_ip_count  = 2
-      minimum_cache_ttl      = 0
+      minimum_cache_ttl      = 30
       maximum_cache_ttl      = 3600
       negative_cache_ttl     = 60
       deprecate_any_requests = true
@@ -35,7 +35,7 @@ See the [Cloudflare product documentation][firewall] and the
 [complete example](../../examples/modules/dns-firewall/main.tf). Replace documentation IPs
 with your upstream server addresses before applying.
 
-`upstream_ips` is a required set. Names default to map keys; explicit names and
+`upstream_ips` requires at least one server address. Names default to map keys; explicit names and
 addresses retain their original values. Individual `account_id` values override
 the module default. The module exposes every configurable resource field,
 including both attack-mitigation flags, ANY-query handling, ECS fallback,

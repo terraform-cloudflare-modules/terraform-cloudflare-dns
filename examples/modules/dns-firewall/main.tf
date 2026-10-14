@@ -9,7 +9,7 @@ module "dns_firewall" {
       dns_firewall_ip_count  = 2
       deprecate_any_requests = true
       ecs_fallback           = false
-      minimum_cache_ttl      = 0
+      minimum_cache_ttl      = 30
       maximum_cache_ttl      = 3600
       negative_cache_ttl     = 60
       retries                = 2

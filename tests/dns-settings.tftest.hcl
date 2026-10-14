@@ -38,7 +38,7 @@ run "direct_id_settings_and_complete_output" {
       nameservers         = { type = " CLOUDFLARE.STANDARD ", ns_set = 2 }
       soa = {
         expire  = 604800
-        min_ttl = 0
+        min_ttl = 60 # The provider requires 60–86400 seconds.
         mname   = "Primary.Example.NET."
         refresh = 10000
         retry   = 2400
@@ -63,13 +63,13 @@ run "direct_id_settings_and_complete_output" {
   }
   assert {
     condition = (
-      output.dns_settings.soa.expire == 604800 && output.dns_settings.soa.min_ttl == 0 &&
+      output.dns_settings.soa.expire == 604800 && output.dns_settings.soa.min_ttl == 60 &&
       output.dns_settings.soa.mname == "Primary.Example.NET." && output.dns_settings.soa.refresh == 10000 &&
       output.dns_settings.soa.retry == 2400 && output.dns_settings.soa.rname == "Admin.Example.COM." &&
       output.dns_settings.soa.ttl == 3600 && contains(keys(output.records), "www") &&
       length(cloudflare_zone.this) == 0 && length(data.cloudflare_zone.this) == 0 && output.dnssec == null
     )
-    error_message = "All SOA fields, including zero and case-sensitive strings, must pass through without acquiring zone or DNSSEC ownership."
+    error_message = "All SOA fields, including the minimum TTL and case-sensitive strings, must pass through without acquiring zone or DNSSEC ownership."
   }
 }
 

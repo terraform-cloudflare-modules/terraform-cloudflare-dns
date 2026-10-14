@@ -20,7 +20,7 @@ run "complete_settings_and_normalization" {
         nameservers         = { type = " CLOUDFLARE.STANDARD.RANDOM " }
         soa = {
           expire  = 604800
-          min_ttl = 0
+          min_ttl = 60 # The provider requires 60–86400 seconds.
           mname   = "Primary.Example.NET."
           refresh = 10000
           retry   = 2400
@@ -38,12 +38,12 @@ run "complete_settings_and_normalization" {
       output.settings.zone_defaults.ns_ttl == 86400 && !output.settings.zone_defaults.secondary_overrides &&
       output.settings.zone_defaults.zone_mode == "dns_only" && output.settings.zone_defaults.internal_dns.reference_zone_id == "reference-zone-id" &&
       output.settings.zone_defaults.nameservers.type == "cloudflare.standard.random" &&
-      output.settings.zone_defaults.soa.expire == 604800 && output.settings.zone_defaults.soa.min_ttl == 0 &&
+      output.settings.zone_defaults.soa.expire == 604800 && output.settings.zone_defaults.soa.min_ttl == 60 &&
       output.settings.zone_defaults.soa.mname == "Primary.Example.NET." && output.settings.zone_defaults.soa.refresh == 10000 &&
       output.settings.zone_defaults.soa.retry == 2400 && output.settings.zone_defaults.soa.rname == "Admin.Example.COM." &&
       output.settings.zone_defaults.soa.ttl == 3600
     )
-    error_message = "All account settings must remain configurable, preserving zero/false and SOA payloads while normalizing DNS enums."
+    error_message = "All account settings must remain configurable, preserving false flags and SOA payloads while normalizing DNS enums."
   }
 }
 

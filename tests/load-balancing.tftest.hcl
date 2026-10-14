@@ -312,8 +312,8 @@ run "account_overrides_and_empty_settings" {
         origins             = [{ address = "192.0.2.1", header = { host = [] } }]
         monitor             = "external-monitor-id"
         monitor_group       = "external-group-id"
-        health_sources      = ["monitor_group"]
-        check_regions       = []
+        health_sources      = ["regional", "global"]
+        check_regions       = ["WEU"] # Regional health requires at least one region.
         notification_filter = {}
         load_shedding       = {}
         origin_steering     = {}
@@ -326,9 +326,9 @@ run "account_overrides_and_empty_settings" {
       length(output.load_balancer_monitors.overridden.header) == 0 && output.load_balancer_monitors.overridden.description == "" &&
       output.load_balancer_pools.overridden.account_id == "pool-account" && output.load_balancer_pools.overridden.monitor == "external-monitor-id" &&
       output.load_balancer_pools.overridden.monitor_group == "external-group-id" &&
-      output.load_balancer_pools.overridden.health_sources[0] == "monitor_group" &&
+      output.load_balancer_pools.overridden.health_sources == tolist(["regional", "global"]) &&
       length(output.load_balancer_pools.overridden.origins[0].header.host) == 0 &&
-      length(output.load_balancer_pools.overridden.check_regions) == 0 && output.load_balancer_pools.overridden.notification_filter != null &&
+      output.load_balancer_pools.overridden.check_regions == tolist(["WEU"]) && output.load_balancer_pools.overridden.notification_filter != null &&
       output.load_balancer_pools.overridden.load_shedding != null && output.load_balancer_pools.overridden.origin_steering != null &&
       data.cloudflare_zone.this[0].filter.account.id == "lookup-account"
     )

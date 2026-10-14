@@ -27,8 +27,8 @@ run "all_fields_and_complete_outputs" {
         dns_firewall_ip_count  = 2
         ecs_fallback           = false
         maximum_cache_ttl      = 3600
-        minimum_cache_ttl      = 0
-        negative_cache_ttl     = 0
+        minimum_cache_ttl      = 30
+        negative_cache_ttl     = 30
         ratelimit              = 1000
         retries                = 0
         upstream_ips           = ["192.0.2.1", "2001:db8::1"]
@@ -50,7 +50,7 @@ run "all_fields_and_complete_outputs" {
       !output.clusters.primary.attack_mitigation.enabled && !output.clusters.primary.attack_mitigation.only_when_upstream_unhealthy &&
       !output.clusters.primary.deprecate_any_requests && !output.clusters.primary.ecs_fallback &&
       output.clusters.primary.dns_firewall_ip_count == 2 && output.clusters.primary.maximum_cache_ttl == 3600 &&
-      output.clusters.primary.minimum_cache_ttl == 0 && output.clusters.primary.negative_cache_ttl == 0 &&
+      output.clusters.primary.minimum_cache_ttl == 30 && output.clusters.primary.negative_cache_ttl == 30 &&
       output.clusters.primary.ratelimit == 1000 && output.clusters.primary.retries == 0 &&
       contains(output.clusters.primary.upstream_ips, "192.0.2.1") && contains(output.clusters.primary.upstream_ips, "2001:db8::1") &&
       contains(output.clusters.primary.dns_firewall_ips, "198.51.100.1") && output.clusters.primary.modified_on == "2026-01-01T00:00:00Z" &&
@@ -61,14 +61,14 @@ run "all_fields_and_complete_outputs" {
   }
 }
 
-run "empty_mitigation_and_upstream_set" {
+run "empty_mitigation" {
   command = plan
   variables {
-    clusters = { empty = { account_id = "account-id", upstream_ips = [], attack_mitigation = {} } }
+    clusters = { empty = { account_id = "account-id", upstream_ips = ["192.0.2.1"], attack_mitigation = {} } }
   }
   assert {
-    condition     = output.clusters.empty.attack_mitigation != null && length(output.clusters.empty.upstream_ips) == 0
-    error_message = "Empty nested settings and upstream sets must pass through for provider validation."
+    condition     = output.clusters.empty.attack_mitigation != null && contains(output.clusters.empty.upstream_ips, "192.0.2.1")
+    error_message = "An empty mitigation object must be preserved alongside a valid upstream server."
   }
 }
 
