@@ -1,5 +1,5 @@
 module "primary_zone" {
-  source = "../.."
+  source = "../../.."
 
   create_zone = true
   account_id  = var.account_id
@@ -8,7 +8,7 @@ module "primary_zone" {
 }
 
 module "secondary_zone" {
-  source = "../.."
+  source = "../../.."
 
   create_zone = true
   account_id  = var.account_id
@@ -17,7 +17,7 @@ module "secondary_zone" {
 }
 
 module "transfers" {
-  source = "../../modules/zone-transfers"
+  source = "../../../modules/zone-transfers"
 
   account_id = var.account_id
 

@@ -381,6 +381,9 @@ which supports account-level ACLs, TSIG keys, peers, and incoming/outgoing trans
 for multiple zones. Pass root module outputs such as `zone_id` into its transfer entries.
 It does not create zones or add resources to existing root module invocations.
 
+Submodule examples live under [`examples/modules`](examples/modules); root-module
+examples remain directly under `examples`.
+
 `modules/record-inputs` remains an internal type-normalization helper.
 
 ## Records and defaults

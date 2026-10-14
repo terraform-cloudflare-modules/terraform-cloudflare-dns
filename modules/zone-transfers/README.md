@@ -45,7 +45,7 @@ is not included in v2.0.0; use a local checkout containing it until a release
 includes it, then pin that release in the calling module.
 
 Configure the Cloudflare provider in the caller. See the
-[complete example](../../examples/zone-transfers/main.tf) for zone creation and
+[complete example](../../examples/modules/zone-transfers/main.tf) for zone creation and
 both transfer directions. Use a secondary zone for incoming transfers and match
 the external primary's signing and transfer configuration. The root module's
 `zone`, `dnssec`, and `dns_settings` inputs handle those zone-specific settings.
