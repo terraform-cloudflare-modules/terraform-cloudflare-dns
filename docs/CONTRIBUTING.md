@@ -1,9 +1,46 @@
-# Commit Message Format
+# Contributing
+
+## Development checks
+
+Install Terraform or OpenTofu, pre-commit, terraform-docs, and TFLint, then run
+`pre-commit install` and `pre-commit run --all-files`.
+The hooks format Terraform, regenerate root-module documentation, validate configurations,
+and check workflows, spelling, Markdown, and secrets. Shared configuration lives in `.github/linters/`.
+
+Run `terraform init -backend=false`, `terraform validate`, and `terraform test`
+(or the equivalent `tofu` commands). Initialize and validate examples, child modules, and test helpers too.
+Use `tests/*.tftest.hcl` for native test cases and `tests/setup/main.tf` for shared setup.
+Follow the [Terraform testing tutorial](https://developer.hashicorp.com/terraform/tutorials/configuration-language/test).
+Mock cloud providers; keep default tests independent of cloud credentials and live infrastructure.
+Assert observable behavior and compatibility guarantees instead of repeating implementation details.
+
+Keep generated provider coverage in `docs/SCHEMA.md` once the module is implemented.
+Use the Formr commands in [UPGRADING.md](UPGRADING.md) to regenerate and check the report.
+
+## Continuous integration and releases
+
+Testing and Super-Linter run independently on pushes and pull requests targeting `main` or `next`.
+Both also support manual dispatch. Testing validates the engine matrix and runs TFLint;
+after its own checks pass on a push, it dispatches the standalone Release workflow with the tested SHA.
+Super-Linter does not gate that dispatch. Release rejects a tested SHA if the branch has advanced.
+
+All workflows default to zero token permissions; jobs receive only the permissions they need.
+Actions are pinned to commit SHAs. Renovate configuration is in `.github/renovate.json`.
+Releases use the repository's `GITHUB_TOKEN`; no personal access token is required.
+Manual Release runs may omit the SHA to release the selected branch head; use a tested SHA when possible.
+
+Semantic Release uses `.releaserc` and conventional commits to publish release notes, tags,
+and the changelog. Configure repository rules to allow its authorized release writes.
+Add meaningful module tests before releasing changes.
+
+## Commit Message Format
 
 This specification is inspired by and supersedes the **Angular commit message format**.
 
 We have very precise rules over how our Git commit messages must be formatted.
 This format leads to **easier to read commit history**.
+
+Keep commit message lines at approximately 80 characters or fewer.
 
 Each commit message consists of a **header**, a **body**, and a **footer**.
 

@@ -17,14 +17,14 @@ body:
     attributes:
       label: Name and Version
       description: Name and version of the affected (sub-)module
-      placeholder: vpc - v1.2.3
+      placeholder: dns - v2.0.0
     validations:
       required: true
   - type: input
     attributes:
-      label: What Terraform version are you using?
+      label: What Terraform/OpenTofu and Cloudflare provider versions are you using?
       description: Provide the version of your Terraform executable (output of `terraform version`)
-      placeholder: v1.9.6
+      placeholder: Terraform 1.16.5 / Cloudflare 5.28.0
   - type: textarea
     attributes:
       label: What steps will reproduce the bug?

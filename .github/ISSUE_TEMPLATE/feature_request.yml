@@ -14,7 +14,7 @@ body:
     attributes:
       label: Name and Version
       description: Name and version of the affected (sub-)module
-      placeholder: vpc - v1.2.3
+      placeholder: dns - v2.0.0
     validations:
       required: true
   - type: textarea
