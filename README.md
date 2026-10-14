@@ -335,7 +335,7 @@ only pools or monitors are configured.
 | `country_pools`, `region_pools`, `pop_pools` | Location-to-pool lists using the same key-or-ID convention. Location codes pass through unchanged. |
 | `random_steering.pool_weights` | Map keys are managed pool keys or existing IDs; numeric weights pass through unchanged. |
 | `rules[*].overrides` | Pool references and weight-map keys resolve exactly as in the base configuration. Rule order is preserved. |
-| Pool `monitor_group` | An existing group ID. This module does not yet create monitor groups. |
+| Pool `monitor_group` | An existing group ID, including an ID from the [monitor-groups submodule](modules/monitor-groups/README.md). |
 
 A matching managed key takes precedence over a literal ID. Unmatched strings are
 forwarded as IDs, so a misspelled key is rejected by the API rather than creating
@@ -381,6 +381,7 @@ resources have separate owners, so they can be reused across zone module instanc
 | Submodule | Ownership and composition |
 | --- | --- |
 | [account-settings](modules/account-settings/README.md) | One account's DNS-only enforcement and defaults for new zones. |
+| [monitor-groups](modules/monitor-groups/README.md) | Groups of existing health monitors; pass group IDs to load-balancing pools. |
 | [zone-transfers](modules/zone-transfers/README.md) | Shared ACLs, TSIG keys, peers, and incoming/outgoing transfers for multiple zones. |
 
 These submodules are called independently; existing root module invocations do

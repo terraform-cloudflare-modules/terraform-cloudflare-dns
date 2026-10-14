@@ -201,8 +201,9 @@ consumer root. Registry publication is separate from creating a GitHub release;
 historical semantic-version tags may also be indexed.
 
 Standalone submodules share the repository's release tags. The
-[zone-transfers](../modules/zone-transfers/README.md), and
-[account-settings](../modules/account-settings/README.md) submodules were added after
+[zone-transfers](../modules/zone-transfers/README.md),
+[account-settings](../modules/account-settings/README.md), and
+[monitor-groups](../modules/monitor-groups/README.md) submodules were added after
 v2.0.0. Each documents its ownership, state moves, and verification requirements.
 Adding their calls does not change existing root-module resource addresses.
 Each shared resource should have one owner; pass IDs between module instances.
