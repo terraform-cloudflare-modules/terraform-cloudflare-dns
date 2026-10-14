@@ -26,6 +26,11 @@ Both also support manual dispatch. Testing validates the engine matrix and runs 
 after its own checks pass on a push, it dispatches the standalone Release workflow with the tested SHA.
 Super-Linter does not gate that dispatch. Release rejects a tested SHA if the branch has advanced.
 
+OpenTofu mock tests use 1.11.14 and 1.13.1, matching the Hetzner storage-box module's
+baseline for nested attributes. The 1.8.8 mock engine can crash when optional nested
+attributes are null. This test-runner baseline does not change the module's Terraform version constraint.
+CI verifies the installed engine version against its matrix entry before validation and testing.
+
 All workflows default to zero token permissions; jobs receive only the permissions they need.
 Actions are pinned to commit SHAs. Renovate configuration is in `.github/renovate.json`.
 Releases use the repository's `GITHUB_TOKEN`; no personal access token is required.

@@ -31,7 +31,7 @@ jobs:
           - engine: terraform
             version: 1.16.6
           - engine: tofu
-            version: 1.8.8
+            version: 1.11.14 # Older mock engines crash on null nested attributes.
           - engine: tofu
             version: 1.13.1
     steps:
@@ -57,8 +57,15 @@ jobs:
       - name: Validate modules, examples, and behavior
         env:
           TF_ENGINE: ${{ matrix.engine }}
+          TF_EXPECTED_VERSION: ${{ matrix.version }}
           TF_IN_AUTOMATION: "1"
         run: |
+          "$TF_ENGINE" version
+          actual_version=$("$TF_ENGINE" version -json | jq -r '.terraform_version')
+          if [[ "$actual_version" != "$TF_EXPECTED_VERSION" ]]; then
+            printf 'Expected %s %s, got %s\n' "$TF_ENGINE" "$TF_EXPECTED_VERSION" "$actual_version" >&2
+            exit 1
+          fi
           "$TF_ENGINE" fmt -check -recursive
           # Discover tracked configurations, including nested modules and test helpers.
           mapfile -t directories < <(
