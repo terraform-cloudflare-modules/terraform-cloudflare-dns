@@ -28,6 +28,7 @@ as described in docs/UPGRADING.md before upgrading existing consumers.
 - Add a standalone account-settings submodule for DNS-only enforcement and new-zone defaults.
 - Add a standalone monitor-groups submodule with complete member controls and reusable group outputs.
 - Add a standalone dns-firewall submodule with complete cluster settings and assigned-address outputs.
+- Add a standalone internal-views submodule for account-level internal zone associations, without Gateway policies.
 - Add a standalone zone-transfers submodule with complete ACL, TSIG, peer, incoming, and outgoing resource support; run standalone submodule tests in CI.
 - Add DNS-only load balancing, geographic and weighted steering, pools, and health monitors with complete upstream inputs and key-or-ID references.
 - Add opt-in zone DNS settings with nested SOA, nameserver, and internal DNS properties and complete outputs.
