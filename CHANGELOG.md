@@ -1,3 +1,19 @@
+## [2.0.0](https://github.com/terraform-cloudflare-modules/terraform-cloudflare-dns/compare/v1.0.0...v2.0.0) (2026-10-14)
+
+### ⚠ BREAKING CHANGES
+
+* replace the single-record API and require Cloudflare v5
+
+Use terraform-cloudflare-modules/dns/cloudflare with Terraform >= 1.8 and
+Cloudflare >= 5.28.0, < 6.0.0. Migrate inputs, outputs, and resource state
+as described in docs/UPGRADING.md before upgrading existing consumers.
+
+### Features
+
+* add optional DNS zone management ([c30d6fc](https://github.com/terraform-cloudflare-modules/terraform-cloudflare-dns/commit/c30d6fc2a81cefb4ab0ee1e73080cf9f0ddbc8d4))
+* introduce the Cloudflare DNS records API ([aae9b98](https://github.com/terraform-cloudflare-modules/terraform-cloudflare-dns/commit/aae9b98f7748d1423b1e3670d91adc0527be05ea))
+* support multiple DNS record content values ([393044d](https://github.com/terraform-cloudflare-modules/terraform-cloudflare-dns/commit/393044da47310c3ffd856cce7967b6c24654f3aa))
+
 ## Unreleased
 
 ### Breaking changes
