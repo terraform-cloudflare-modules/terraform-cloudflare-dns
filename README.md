@@ -22,7 +22,8 @@ This repository is the successor to `terraform-cloudflare-dns-record`. The v2 AP
 with optional zone, DNSSEC, zone-wide DNS settings, and load balancing management.
 Further DNS capabilities are planned as optional additions within this module's scope.
 
-**Release status:** v2 is under development. The Registry source shown below is the intended v2 address; it must be published before Registry installation works.
+**Release status:** v2.0.0 has been released. This branch includes newer, unreleased DNSSEC, DNS settings, load balancing, and zone-transfer features.
+Examples using these additions require a checkout containing them until a release includes them. Registry publication is separate from a GitHub release.
 The historical `v1.0.0` tag retains the original single-record API. Existing users should read the [v2 migration guide](docs/UPGRADING.md).
 
 ## ✨ TL;DR
@@ -371,6 +372,16 @@ Replace the documentation IPs with reachable endpoints before applying the examp
 [lb_proxy]: https://developers.cloudflare.com/load-balancing/understand-basics/proxy-modes/
 [lb_geo]: https://developers.cloudflare.com/load-balancing/understand-basics/traffic-steering/steering-policies/geo-steering/
 [lb_dns]: https://developers.cloudflare.com/load-balancing/load-balancers/dns-records/
+
+## Standalone submodules
+
+The root module manages one zone and its DNS features. Independently managed,
+shared transfer infrastructure is available through [zone-transfers](modules/zone-transfers/README.md),
+which supports account-level ACLs, TSIG keys, peers, and incoming/outgoing transfers
+for multiple zones. Pass root module outputs such as `zone_id` into its transfer entries.
+It does not create zones or add resources to existing root module invocations.
+
+`modules/record-inputs` remains an internal type-normalization helper.
 
 ## Records and defaults
 

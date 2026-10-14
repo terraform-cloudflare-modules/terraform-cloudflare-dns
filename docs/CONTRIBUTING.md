@@ -9,6 +9,9 @@ and check workflows, spelling, Markdown, and secrets. Shared configuration lives
 
 Run `terraform init -backend=false`, `terraform validate`, and `terraform test`
 (or the equivalent `tofu` commands). Initialize and validate examples, child modules, and test helpers too.
+Run standalone submodule suites from their own directories, for example
+`terraform -chdir=modules/zone-transfers test`. CI discovers each suite from tracked
+`tests/*.tftest.hcl` files at the root and inside submodules; new tests must be committed to be included.
 Use `tests/*.tftest.hcl` for native test cases and `tests/setup/main.tf` for shared setup.
 Follow the [Terraform testing tutorial](https://developer.hashicorp.com/terraform/tutorials/configuration-language/test).
 Mock cloud providers; keep default tests independent of cloud credentials and live infrastructure.

@@ -186,18 +186,24 @@ Regenerate README inputs/outputs with `terraform-docs -c .github/linters/.terraf
 Resource IDs remain provider-managed. Removed provider fields are not reintroduced as inputs;
 still-configurable deprecated settings are identified with their preferred replacement.
 
-## First v2 publication
+## Release and Registry publication
 
-Keep the original `v1.0.0` tag. Use a conventional breaking-change commit for the
-v2 API so Semantic Release selects the next major version. Follow the shared
+Keep the original `v1.0.0` and released `v2.0.0` tags. New features on `main` can
+postdate the latest release; use the corresponding release or an explicit revision
+when adopting them. Follow the shared
 [CI and release process](CONTRIBUTING.md#continuous-integration-and-releases).
 Complete the provider checks and disposable-zone migration verification before
-merging the release change, and update the README release-status paragraph.
+publishing further changes, and update the README release-status paragraph.
 
 Publish `terraform-cloudflare-dns` through the Terraform Registry UI as
 `terraform-cloudflare-modules/dns/cloudflare`, then verify installation in a fresh
 consumer root. Registry publication is separate from creating a GitHub release;
 historical semantic-version tags may also be indexed.
+
+Standalone submodules share the repository's release tags. The
+[zone-transfers submodule](../modules/zone-transfers/README.md) was added after
+v2.0.0 and has its own ownership, state-move, and verification instructions.
+Adding its call does not change existing root-module resource addresses.
 
 ## Adopt an existing zone
 

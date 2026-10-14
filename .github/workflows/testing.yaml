@@ -81,7 +81,16 @@ jobs:
             "$TF_ENGINE" -chdir="$directory" init -backend=false -input=false -no-color
             "$TF_ENGINE" -chdir="$directory" validate -no-color
           done
-          "$TF_ENGINE" test -no-color
+          # Run each module's suite, including standalone public submodules.
+          mapfile -t test_directories < <(
+            git ls-files -z -- '*.tftest.hcl' |
+              while IFS= read -r -d '' test_file; do
+                dirname "$(dirname "$test_file")"
+              done | sort -u
+          )
+          for directory in "${test_directories[@]}"; do
+            "$TF_ENGINE" -chdir="$directory" test -no-color
+          done
 
   lint:
     runs-on: ubuntu-latest
@@ -112,7 +121,7 @@ jobs:
           for directory in "${directories[@]}"; do
             args=(--chdir="$directory" --format compact --config="$GITHUB_WORKSPACE/.github/linters/.tflint.hcl")
             # Test helpers follow HashiCorp's single-file main.tf examples.
-            if [[ "$directory" == tests || "$directory" == tests/* ]]; then
+            if [[ "$directory" == tests || "$directory" == tests/* || "$directory" == */tests || "$directory" == */tests/* ]]; then
               args+=(--disable-rule=terraform_standard_module_structure)
             fi
             tflint "${args[@]}"

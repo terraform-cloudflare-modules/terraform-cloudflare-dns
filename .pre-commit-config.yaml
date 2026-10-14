@@ -53,18 +53,18 @@ repos:
     hooks:
       - id: terraform_fmt
       - id: terraform_docs
-        # Document the root and typed input helper without fixture READMEs.
-        files: ^([^/]+|modules/record-inputs/[^/]+)\.tf$
+        # Document the root and submodules without fixture READMEs.
+        files: ^([^/]+|modules/[^/]+/[^/]+)\.tf$
         args:
           - "--args=--config=.github/linters/.terraform-docs.yml"
           - "--args=--lockfile=false"
       - id: terraform_tflint
-        exclude: ^tests/
+        exclude: (^|/)tests/
         args:
           - "--args=--config=__GIT_WORKING_DIR__/.github/linters/.tflint.hcl"
       - id: terraform_tflint
         name: Terraform lint (test helpers)
-        files: ^tests/.*\.tf$
+        files: (^|/)tests/.*\.tf$
         args:
           - "--args=--config=__GIT_WORKING_DIR__/.github/linters/.tflint.hcl"
           # HashiCorp's test helpers put variables and outputs in main.tf.
