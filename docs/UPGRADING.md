@@ -202,8 +202,9 @@ historical semantic-version tags may also be indexed.
 
 Standalone submodules share the repository's release tags. The
 [zone-transfers](../modules/zone-transfers/README.md),
-[account-settings](../modules/account-settings/README.md), and
-[monitor-groups](../modules/monitor-groups/README.md) submodules were added after
+[account-settings](../modules/account-settings/README.md),
+[monitor-groups](../modules/monitor-groups/README.md), and
+[dns-firewall](../modules/dns-firewall/README.md) submodules were added after
 v2.0.0. Each documents its ownership, state moves, and verification requirements.
 Adding their calls does not change existing root-module resource addresses.
 Each shared resource should have one owner; pass IDs between module instances.

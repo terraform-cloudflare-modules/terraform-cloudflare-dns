@@ -2,13 +2,12 @@
 
 The product boundary is Cloudflare DNS. The v2 implementation manages records with optional ownership of their zone,
 DNSSEC configuration, zone-wide DNS settings, and load balancing with pools and health monitors.
-Standalone submodules manage account DNS settings, monitor groups,
+Standalone submodules manage account DNS settings, monitor groups, DNS Firewall,
 and zone transfers with peers, TSIG keys, and ACLs.
 
 ## ➕ Additions
 
 - Further internal DNS views.
-- DNS Firewall.
 
 Custom nameserver creation needs upstream provider support: the reviewed schema has
 no dedicated resource. Selecting existing nameserver sets is already supported.

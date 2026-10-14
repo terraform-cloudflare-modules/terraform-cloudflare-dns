@@ -382,6 +382,7 @@ resources have separate owners, so they can be reused across zone module instanc
 | --- | --- |
 | [account-settings](modules/account-settings/README.md) | One account's DNS-only enforcement and defaults for new zones. |
 | [monitor-groups](modules/monitor-groups/README.md) | Groups of existing health monitors; pass group IDs to load-balancing pools. |
+| [dns-firewall](modules/dns-firewall/README.md) | Firewall clusters protecting external authoritative DNS servers. |
 | [zone-transfers](modules/zone-transfers/README.md) | Shared ACLs, TSIG keys, peers, and incoming/outgoing transfers for multiple zones. |
 
 These submodules are called independently; existing root module invocations do
