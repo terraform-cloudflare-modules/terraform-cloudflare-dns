@@ -1,3 +1,24 @@
+resource "cloudflare_zone" "this" {
+  count = var.create && var.create_zone ? 1 : 0
+
+  account             = { id = var.account_id }
+  name                = local.zone_name
+  paused              = var.zone.paused
+  type                = var.zone.type
+  vanity_name_servers = var.zone.vanity_name_servers
+
+  lifecycle {
+    precondition {
+      condition     = local.zone_selection_valid
+      error_message = "Managed zones require zone_name and exclude zone_id and zone_filter."
+    }
+    precondition {
+      condition     = local.account_selection_valid
+      error_message = "Managed zones require account_id."
+    }
+  }
+}
+
 data "cloudflare_zone" "this" {
   count = var.create && local.lookup_zone ? 1 : 0
 
@@ -18,7 +39,7 @@ data "cloudflare_zone" "this" {
     }
     precondition {
       condition     = local.account_selection_valid
-      error_message = "account_id is only supported with zone_name; use zone_filter.account for advanced lookups."
+      error_message = "Managed zones require account_id. Otherwise account_id is only supported with zone_name; use zone_filter.account for advanced lookups."
     }
   }
 }
@@ -47,7 +68,7 @@ resource "cloudflare_dns_record" "this" {
     }
     precondition {
       condition     = local.account_selection_valid
-      error_message = "account_id is only supported with zone_name; use zone_filter.account for advanced lookups."
+      error_message = "Managed zones require account_id. Otherwise account_id is only supported with zone_name; use zone_filter.account for advanced lookups."
     }
     precondition {
       condition     = !each.value.proxied || each.value.ttl == 1

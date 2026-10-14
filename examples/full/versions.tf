@@ -11,6 +11,6 @@ terraform {
 provider "cloudflare" {}
 
 variable "zone_name" {
-  description = "Existing Cloudflare zone name."
+  description = "Domain name of the zone to create, or import before applying."
   type        = string
 }

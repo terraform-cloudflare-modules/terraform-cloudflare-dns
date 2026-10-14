@@ -1,8 +1,14 @@
 module "dns" {
   source = "../.."
 
-  zone_name  = var.zone_name
-  account_id = var.account_id
+  create_zone = true
+  zone_name   = var.zone_name
+  account_id  = var.account_id
+
+  zone = {
+    type   = "full"
+    paused = false
+  }
 
   defaults = {
     ttl  = 1

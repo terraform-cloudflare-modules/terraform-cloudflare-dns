@@ -186,3 +186,55 @@ Publish `terraform-cloudflare-dns` through the Terraform Registry UI as
 `terraform-cloudflare-modules/dns/cloudflare`, then verify installation in a fresh
 consumer root. Registry publication is separate from creating a GitHub release;
 historical semantic-version tags may also be indexed.
+
+## Adopt an existing zone
+
+Zone management is optional and defaults off. Existing record-only consumers keep
+all resource addresses and lookup behavior. For a zone already on Cloudflare,
+set `create_zone = true`, `zone_name`, and `account_id`, and remove `zone_id` or
+`zone_filter`. Match the current zone properties in `zone` before importing.
+
+Import a zone that is not already owned by another Terraform resource using a
+consumer-root import block:
+
+```hcl
+import {
+  to = module.dns.cloudflare_zone.this[0]
+  id = "023e105f4ecef8ad9ca31a8372d0c353"
+}
+```
+
+Alternatively, after configuring the module, run:
+
+```shell
+terraform import 'module.dns.cloudflare_zone.this[0]' '<zone_id>'
+```
+
+If the zone is already managed at another address in the same state, move it
+instead of importing it a second time:
+
+```hcl
+moved {
+  from = cloudflare_zone.existing
+  to   = module.dns.cloudflare_zone.this[0]
+}
+```
+
+Remove the previous resource declaration when moving it. For ownership in a
+separate state, coordinate the state handoff before adopting the zone here.
+Review the plan: adoption must not create, replace or delete the existing zone.
+Confirm the record names and IDs remain unchanged. Switching from direct-ID
+mode to a managed zone qualifies relative names, so review any resulting name diff.
+
+Setting `create_zone = false` after adoption schedules deletion of the zone;
+setting `create = false` schedules deletion of both the zone and managed records.
+Zone deletion affects the entire remote zone, including records not in this module.
+To return to record-only management, explicitly move or remove the zone from
+Terraform ownership without destroying it, then change the module configuration.
+Registrar nameserver delegation and DNSSEC DS publication are separate operations.
+
+The managed-zone resource exposes every configurable property in the reviewed
+Cloudflare schema: `account.id`, `name`, `type`, `paused`, and `vanity_name_servers`.
+All computed properties are retained in `zone`; `name_servers` is a convenience output.
+The checked-in Formr report currently predates this addition and must be regenerated
+and checked with the installed provider before committing the audited change.

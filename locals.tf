@@ -1,13 +1,26 @@
 locals {
   # Decide lookup count from configuration, not a potentially unknown zone ID.
-  lookup_zone = var.zone_name != null || var.zone_filter != null
+  lookup_zone = !var.create_zone && (var.zone_name != null || var.zone_filter != null)
   zone_selection_valid = !var.create || (
+    var.create_zone ? (var.zone_name != null && var.zone_id == null && var.zone_filter == null) :
     (var.zone_id != null ? 1 : 0) + (var.zone_name != null ? 1 : 0) + (var.zone_filter != null ? 1 : 0) == 1
   )
-  account_selection_valid = !var.create || var.account_id == null || var.zone_name != null
+  account_selection_valid = !var.create || (
+    var.create_zone ? var.account_id != null : (var.account_id == null || var.zone_name != null)
+  )
+  zone_options_valid = !var.create || var.create_zone || alltrue([
+    var.zone.paused == null, var.zone.type == null, var.zone.vanity_name_servers == null
+  ])
 
-  zone_id   = var.create ? (local.lookup_zone ? data.cloudflare_zone.this[0].id : var.zone_id) : null
-  zone_name = var.create && local.lookup_zone ? lower(trimsuffix(data.cloudflare_zone.this[0].name, ".")) : null
+  zone_id = !var.create ? null : (
+    var.create_zone ? cloudflare_zone.this[0].id : (local.lookup_zone ? data.cloudflare_zone.this[0].id : var.zone_id)
+  )
+  zone_name = !var.create ? null : (
+    var.create_zone ? (var.zone_name == null ? null : lower(trimsuffix(trimspace(var.zone_name), "."))) :
+    (local.lookup_zone ? lower(trimsuffix(data.cloudflare_zone.this[0].name, ".")) : null)
+  )
+  # Preserve each upstream object's shape; resource and data-source schemas differ.
+  zone = try(cloudflare_zone.this[0], data.cloudflare_zone.this[0], null)
 }
 
 locals {

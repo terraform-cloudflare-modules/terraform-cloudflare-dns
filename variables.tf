@@ -1,12 +1,30 @@
 variable "create" {
-  description = "Whether to manage DNS records and perform zone lookups. Disabling an existing module plans destruction of its managed records."
+  description = "Whether to manage DNS resources and perform zone lookups. Disabling an existing module plans destruction of its managed records and any managed zone."
   type        = bool
   default     = true
   nullable    = false
 }
 
+variable "create_zone" {
+  description = "Whether to manage the zone itself. Requires zone_name and account_id; excludes zone_id and zone_filter. Import an existing zone before applying to adopt it."
+  type        = bool
+  default     = false
+  nullable    = false
+}
+
+variable "zone" {
+  description = "Optional managed-zone properties. Only supported with create_zone = true. Null values defer to the provider; an empty vanity_name_servers list explicitly clears custom nameservers."
+  type = object({
+    paused              = optional(bool)
+    type                = optional(string)
+    vanity_name_servers = optional(list(string))
+  })
+  default  = {}
+  nullable = false
+}
+
 variable "zone_id" {
-  description = "Existing zone ID. Bypasses zone lookup; may be unknown until apply. Mutually exclusive with zone_name and zone_filter."
+  description = "Existing zone ID. Bypasses zone lookup; may be unknown until apply. Mutually exclusive with zone_name, zone_filter, and create_zone."
   type        = string
   default     = null
 
@@ -17,7 +35,7 @@ variable "zone_id" {
 }
 
 variable "zone_name" {
-  description = "Existing zone name to look up. Mutually exclusive with zone_id and zone_filter. Use account_id to disambiguate accounts."
+  description = "Zone name to create/manage when create_zone is true, or look up otherwise. Mutually exclusive with zone_id and zone_filter. Use Punycode for internationalized names."
   type        = string
   default     = null
 
@@ -28,7 +46,7 @@ variable "zone_name" {
 }
 
 variable "account_id" {
-  description = "Account ID for a zone_name lookup. For advanced lookups use zone_filter.account instead."
+  description = "Account ID required for a managed zone, or an optional account filter for a zone_name lookup. For advanced lookups use zone_filter.account instead."
   type        = string
   default     = null
 

@@ -18,8 +18,8 @@
 A [Terraform module][module] to manage [Cloudflare][cloudflare] DNS with stable record keys,
 typed inputs, and access to every configurable DNS record property.
 
-This repository is the successor to `terraform-cloudflare-dns-record`. The v2 API manages individual records in one existing zone per module invocation.
-Zone creation, DNSSEC, and further DNS capabilities are planned as optional additions within this module's scope.
+This repository is the successor to `terraform-cloudflare-dns-record`. The v2 API manages individual records in one zone per module invocation, with optional ownership of the zone itself.
+DNSSEC and further DNS capabilities are planned as optional additions within this module's scope.
 
 **Release status:** v2 is under development. The Registry source shown below is the intended v2 address; it must be published before Registry installation works.
 The historical `v1.0.0` tag retains the original single-record API. Existing users should read the [v2 migration guide](docs/UPGRADING.md).
@@ -73,7 +73,7 @@ Run examples from this checkout before publication.
 
 ## Zone selection
 
-Set exactly one selector when `create = true`:
+With `create_zone = false` (the default), set exactly one selector when `create = true`:
 
 | Selector | Behavior |
 | --- | --- |
@@ -98,6 +98,52 @@ Selector presence must be known at plan time. In direct-ID mode, leave `zone_nam
 
 In lookup mode, relative names are joined to the returned canonical zone name. In direct-ID mode, relative names and `@` are sent to Cloudflare for resolution.
 The `zone` and `zone_name` outputs are null in direct-ID mode. Use `full_name` if you need to provide an exact FQDN without a lookup.
+
+## Zone management
+
+Set `create_zone = true` to create a zone or manage one imported into this module:
+
+```hcl
+module "dns" {
+  source  = "terraform-cloudflare-modules/dns/cloudflare"
+  version = "~> 2.0"
+
+  create_zone = true
+  zone_name   = "example.com"
+  account_id  = var.cloudflare_account_id
+
+  zone = {
+    type   = "full"
+    paused = false
+  }
+
+  records = {
+    www = { type = "A", content = "192.0.2.10" }
+  }
+}
+```
+
+Managed zones require `zone_name` and `account_id`; leave `zone_id` and `zone_filter` unset.
+This mode bypasses lookup. The zone name is trimmed, lowercased and stripped of its terminal dot,
+and relative record names use that normalized domain before Cloudflare assigns the zone ID.
+The account ID and generated zone ID may be unknown at plan time; `create` and `create_zone` must be known.
+
+The `zone` object exposes `type`, `paused` and `vanity_name_servers`, alongside the resource's
+`name` and `account.id` supplied by the top-level inputs. Null optional properties defer to the provider.
+`paused = false` and `vanity_name_servers = []` remain explicit values. Zone properties require managed-zone mode.
+Zone types and account entitlements are validated by Cloudflare/the provider; selecting a secondary or internal
+zone type does not configure transfers, DNS views or Gateway policies.
+
+`zone` exposes the complete resource in managed mode and the complete data-source result in lookup mode;
+these upstream objects have different shapes. `name_servers` exposes the Cloudflare-assigned nameservers
+in either mode. Both are null in direct-ID mode. Other delegation information remains in the zone object,
+including `original_name_servers` and `verification_key`. Update registrar or parent-zone delegation separately.
+
+Zone ownership is opt-in. Import existing zones before the first apply, following
+[the adoption guide](docs/UPGRADING.md#adopt-an-existing-zone). Changing `create_zone` from true to false
+plans to destroy the managed zone; it does not relinquish ownership safely. Deleting a zone also removes
+its DNS configuration, including records outside this module. Keep managed-zone configuration in place
+until you have explicitly migrated its state ownership.
 
 ## Records and defaults
 
@@ -128,7 +174,7 @@ This avoids Terraform's homogeneous-map conversion changing the dynamic flag typ
 
 Module validation checks selection, naming, content/data exclusivity, TTLs and numeric flags. Cloudflare/provider validation remains authoritative for record-type-specific combinations and account features.
 
-`create = false` suppresses lookups and records. If the module already manages records, setting it to false plans to destroy those records.
+`create = false` suppresses zones, lookups and records. Setting it to false plans to destroy all resources owned by this module, including a managed zone.
 Use it as a creation switch, not as a way to pause management.
 
 ## Outputs and compatibility
@@ -159,22 +205,25 @@ No modules.
 
 | Name | Description | Type | Default | Required |
 | ---- | ----------- | ---- | ------- | :------: |
-| <a name="input_account_id"></a> [account\_id](#input\_account\_id) | Account ID for a zone\_name lookup. For advanced lookups use zone\_filter.account instead. | `string` | `null` | no |
-| <a name="input_create"></a> [create](#input\_create) | Whether to manage DNS records and perform zone lookups. Disabling an existing module plans destruction of its managed records. | `bool` | `true` | no |
+| <a name="input_account_id"></a> [account\_id](#input\_account\_id) | Account ID required for a managed zone, or an optional account filter for a zone\_name lookup. For advanced lookups use zone\_filter.account instead. | `string` | `null` | no |
+| <a name="input_create"></a> [create](#input\_create) | Whether to manage DNS resources and perform zone lookups. Disabling an existing module plans destruction of its managed records and any managed zone. | `bool` | `true` | no |
+| <a name="input_create_zone"></a> [create\_zone](#input\_create\_zone) | Whether to manage the zone itself. Requires zone\_name and account\_id; excludes zone\_id and zone\_filter. Import an existing zone before applying to adopt it. | `bool` | `false` | no |
 | <a name="input_defaults"></a> [defaults](#input\_defaults) | Record defaults. Non-null per-record values override these; empty comments, empty tags, and empty settings explicitly override defaults. Settings are replaced as a whole. | ```object({ comment = optional(string) include_shadow_metadata = optional(bool) private_routing = optional(bool) proxied = optional(bool, false) tags = optional(set(string)) ttl = optional(number, 1) settings = optional(object({ flatten_cname = optional(bool) ipv4_only = optional(bool) ipv6_only = optional(bool) })) })``` | `{}` | no |
 | <a name="input_records"></a> [records](#input\_records) | DNS records keyed by stable caller-chosen identifiers. Use relative name (defaults to key), @ or empty name for apex, or full\_name for an FQDN. Supply exactly one of content or data. Numeric CAA/DNSKEY flags are accepted and normalized to numbers; NAPTR flags remain strings. | ```map(object({ name = optional(string) full_name = optional(string) type = string content = optional(string) comment = optional(string) include_shadow_metadata = optional(bool) priority = optional(number) private_routing = optional(bool) proxied = optional(bool) tags = optional(set(string)) ttl = optional(number) settings = optional(object({ flatten_cname = optional(bool) ipv4_only = optional(bool) ipv6_only = optional(bool) })) data = optional(object({ algorithm = optional(number) altitude = optional(number) certificate = optional(string) digest = optional(string) digest_type = optional(number) fingerprint = optional(string) flags = optional(string) key_tag = optional(number) lat_degrees = optional(number) lat_direction = optional(string) lat_minutes = optional(number) lat_seconds = optional(number) long_degrees = optional(number) long_direction = optional(string) long_minutes = optional(number) long_seconds = optional(number) matching_type = optional(number) order = optional(number) port = optional(number) precision_horz = optional(number) precision_vert = optional(number) preference = optional(number) priority = optional(number) protocol = optional(number) public_key = optional(string) regex = optional(string) replacement = optional(string) selector = optional(number) service = optional(string) size = optional(number) tag = optional(string) target = optional(string) type = optional(number) usage = optional(number) value = optional(string) weight = optional(number) })) }))``` | `{}` | no |
+| <a name="input_zone"></a> [zone](#input\_zone) | Optional managed-zone properties. Only supported with create\_zone = true. Null values defer to the provider; an empty vanity\_name\_servers list explicitly clears custom nameservers. | ```object({ paused = optional(bool) type = optional(string) vanity_name_servers = optional(list(string)) })``` | `{}` | no |
 | <a name="input_zone_filter"></a> [zone\_filter](#input\_zone\_filter) | Complete cloudflare\_zone lookup filter. Must match exactly one zone. Mutually exclusive with zone\_id, zone\_name, and account\_id. Filter strings, including operators, are passed through unchanged. | ```object({ account = optional(object({ id = optional(string) name = optional(string) })) direction = optional(string) match = optional(string) name = optional(string) order = optional(string) status = optional(string) type = optional(list(string)) })``` | `null` | no |
-| <a name="input_zone_id"></a> [zone\_id](#input\_zone\_id) | Existing zone ID. Bypasses zone lookup; may be unknown until apply. Mutually exclusive with zone\_name and zone\_filter. | `string` | `null` | no |
-| <a name="input_zone_name"></a> [zone\_name](#input\_zone\_name) | Existing zone name to look up. Mutually exclusive with zone\_id and zone\_filter. Use account\_id to disambiguate accounts. | `string` | `null` | no |
+| <a name="input_zone_id"></a> [zone\_id](#input\_zone\_id) | Existing zone ID. Bypasses zone lookup; may be unknown until apply. Mutually exclusive with zone\_name, zone\_filter, and create\_zone. | `string` | `null` | no |
+| <a name="input_zone_name"></a> [zone\_name](#input\_zone\_name) | Zone name to create/manage when create\_zone is true, or look up otherwise. Mutually exclusive with zone\_id and zone\_filter. Use Punycode for internationalized names. | `string` | `null` | no |
 
 ## Outputs
 
 | Name | Description |
 | ---- | ----------- |
+| <a name="output_name_servers"></a> [name\_servers](#output\_name\_servers) | Cloudflare-assigned nameservers for the managed or looked-up zone. Null in direct zone\_id mode or when disabled. Registrar delegation is managed separately. |
 | <a name="output_records"></a> [records](#output\_records) | Complete DNS resources keyed by the input record keys. Includes IDs, names, content, proxied (enabled), proxiable (capable), metadata, and timestamps. Empty when disabled. |
-| <a name="output_zone"></a> [zone](#output\_zone) | Complete zone lookup result, including computed properties. Null in direct zone\_id mode or when disabled. |
+| <a name="output_zone"></a> [zone](#output\_zone) | Complete managed zone or zone lookup result, preserving its upstream schema and computed properties. Null in direct zone\_id mode or when disabled. |
 | <a name="output_zone_id"></a> [zone\_id](#output\_zone\_id) | Target zone ID, or null when disabled. |
-| <a name="output_zone_name"></a> [zone\_name](#output\_zone\_name) | Canonical name of the looked-up zone. Null in direct zone\_id mode or when disabled. |
+| <a name="output_zone_name"></a> [zone\_name](#output\_zone\_name) | Normalized name of the managed or looked-up zone. Null in direct zone\_id mode or when disabled. |
 <!-- END_TF_DOCS -->
 
 ### 🔃 Contributing

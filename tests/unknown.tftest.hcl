@@ -12,3 +12,20 @@ run "unknown_id_and_content_keep_stable_addresses" {
     error_message = "Unknown zone IDs and content must not determine lookup count or record keys."
   }
 }
+
+run "unknown_account_and_zone_id_keep_stable_addresses" {
+  command = plan
+
+  module {
+    source = "./tests/fixtures/unknown"
+  }
+
+  variables {
+    create_zone = true
+  }
+
+  assert {
+    condition     = length(output.record_keys) == 1 && contains(output.record_keys, "stable_key") && output.record_name == "www.example.com"
+    error_message = "Unknown account and generated zone IDs must not prevent planning record identities or fully qualified names."
+  }
+}

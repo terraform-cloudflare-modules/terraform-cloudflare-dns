@@ -9,6 +9,8 @@
 
 ### Improvements
 
+- Add opt-in zone creation/adoption, all zone resource inputs, and complete zone/nameserver outputs.
+
 - Add direct zone IDs, account-aware lookup, full zone filters, record defaults and DNS-name normalization.
 - Add native mock tests, basic/full examples, and upgrade guidance including Formr coverage maintenance.
 - Align repository layout, development tooling, and test-triggered releases with the standardized Hetzner modules.
