@@ -44,6 +44,34 @@ data "cloudflare_zone" "this" {
   }
 }
 
+resource "cloudflare_zone_dns_settings" "this" {
+  count = var.create && var.create_dns_settings ? 1 : 0
+
+  zone_id             = local.zone_id
+  flatten_all_cnames  = var.dns_settings.flatten_all_cnames
+  foundation_dns      = var.dns_settings.foundation_dns
+  multi_provider      = var.dns_settings.multi_provider
+  ns_ttl              = var.dns_settings.ns_ttl
+  secondary_overrides = var.dns_settings.secondary_overrides
+  zone_mode           = var.dns_settings.zone_mode == null ? null : lower(trimspace(var.dns_settings.zone_mode))
+  internal_dns        = var.dns_settings.internal_dns
+  nameservers = var.dns_settings.nameservers == null ? null : merge(var.dns_settings.nameservers, {
+    type = var.dns_settings.nameservers.type == null ? null : lower(trimspace(var.dns_settings.nameservers.type))
+  })
+  soa = var.dns_settings.soa
+
+  lifecycle {
+    precondition {
+      condition     = local.zone_selection_valid
+      error_message = "DNS settings require exactly one valid zone selector, or a managed zone."
+    }
+    precondition {
+      condition     = local.account_selection_valid
+      error_message = "Managed zones require account_id. Otherwise account_id is only supported with zone_name; use zone_filter.account for advanced lookups."
+    }
+  }
+}
+
 resource "cloudflare_zone_dnssec" "this" {
   count = var.create && var.create_dnssec ? 1 : 0
 
@@ -68,8 +96,8 @@ resource "cloudflare_zone_dnssec" "this" {
 resource "cloudflare_dns_record" "this" {
   for_each = local.records
 
-  # External DNSKEY records require multi-signer DNSSEC to be configured first.
-  depends_on = [cloudflare_zone_dnssec.this]
+  # Configure zone-wide behavior and multi-signer DNSSEC before adding records.
+  depends_on = [cloudflare_zone_dns_settings.this, cloudflare_zone_dnssec.this]
 
   zone_id                 = local.zone_id
   name                    = each.value.name

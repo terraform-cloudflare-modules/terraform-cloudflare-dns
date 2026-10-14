@@ -22,3 +22,8 @@ output "dnssec_ds" {
   description = "DS record to publish through the registrar or parent zone after enabling DNSSEC."
   value       = module.dns.dnssec_ds
 }
+
+output "dns_settings" {
+  description = "Complete zone-wide DNS settings."
+  value       = module.dns.dns_settings
+}

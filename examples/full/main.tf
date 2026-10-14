@@ -10,6 +10,21 @@ module "dns" {
     paused = false
   }
 
+  create_dns_settings = true
+  dns_settings = {
+    flatten_all_cnames  = false
+    multi_provider      = false
+    ns_ttl              = 86400
+    secondary_overrides = false
+    zone_mode           = "standard"
+    nameservers         = { type = "cloudflare.standard" }
+    soa = {
+      min_ttl = 1800
+      rname   = "admin.example.com"
+      ttl     = 3600
+    }
+  }
+
   create_dnssec = true
   dnssec = {
     status              = "active"

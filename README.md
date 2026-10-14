@@ -18,7 +18,7 @@
 A [Terraform module][module] to manage [Cloudflare][cloudflare] DNS with stable record keys,
 typed inputs, and access to every configurable DNS record property.
 
-This repository is the successor to `terraform-cloudflare-dns-record`. The v2 API manages individual records in one zone per module invocation, with optional ownership of the zone and its DNSSEC configuration.
+This repository is the successor to `terraform-cloudflare-dns-record`. The v2 API manages individual records in one zone per module invocation, with optional zone, DNSSEC, and zone-wide DNS settings management.
 Further DNS capabilities are planned as optional additions within this module's scope.
 
 **Release status:** v2 is under development. The Registry source shown below is the intended v2 address; it must be published before Registry installation works.
@@ -211,6 +211,60 @@ To stop managing DNSSEC while keeping it enabled, transfer or remove its state o
 [dnssec_multisigner]: https://developers.cloudflare.com/dns/dnssec/multi-signer-dnssec/setup/
 [dnssec_secondary]: https://developers.cloudflare.com/dns/zone-setups/zone-transfers/cloudflare-as-secondary/dnssec-for-secondary/
 
+## Zone DNS settings
+
+Manage [zone-wide DNS behavior][dns_settings_resource] independently of zone and DNSSEC ownership:
+
+```hcl
+create_dns_settings = true
+dns_settings = {
+  flatten_all_cnames  = false
+  multi_provider      = true
+  ns_ttl              = 86400
+  secondary_overrides = false
+  zone_mode           = "standard"
+  nameservers         = { type = "cloudflare.standard" }
+  soa = {
+    min_ttl = 1800
+    rname   = "admin.example.com"
+    ttl     = 3600
+  }
+}
+```
+
+`create_dns_settings` defaults to false and must be known at plan time. Settings may
+contain unknown values, and the selected zone ID may come from another resource.
+The `dns_settings` output returns the complete resource, or null when unmanaged or `create = false`.
+Settings require explicit ownership even when you already manage the zone or DNSSEC.
+
+| Property | Purpose |
+| --- | --- |
+| `flatten_all_cnames` | Apply CNAME flattening throughout the zone. Apex flattening is handled by Cloudflare regardless of this flag. |
+| `multi_provider` | Configure Cloudflare's multi-provider DNS behavior; useful alongside multi-signer DNSSEC. |
+| `ns_ttl` | TTL of the zone's NS records. |
+| `secondary_overrides` | Permit override behavior for secondary zones. |
+| `zone_mode` | `standard`, `cdn_only`, or `dns_only`; trimmed and lowercased. |
+| `internal_dns.reference_zone_id` | Reference zone for internal DNS fallback. |
+| `nameservers` | Required `type`, optional `ns_set` and `nameserver_set_id`; only `type` is trimmed and lowercased. |
+| `soa` | `expire`, `min_ttl`, `mname`, `refresh`, `retry`, `rname`, and `ttl`. SOA names are passed through unchanged. |
+| `foundation_dns` | Deprecated upstream compatibility field; prefer `nameservers.type` for Advanced Nameservers. |
+
+Null values defer to the provider. Explicit false, zero, and optional empty objects are
+forwarded, subject to upstream validation. Partial nested objects retain unset fields as null;
+they are not filled with module-defined defaults. Cloudflare validates plan entitlements,
+nameserver configurations, and setting combinations. Custom nameserver sets must already exist.
+
+These settings affect the entire zone, including records managed elsewhere. They are distinct
+from `defaults`, which supplies per-record inputs only to this module's records.
+Managed settings are applied before records so new records use the intended zone behavior.
+DNSSEC remains independently configured; setting `multi_provider = true` alone does not enable signing.
+
+Read the [settings adoption guide](docs/UPGRADING.md#adopt-zone-dns-settings) before taking ownership.
+Null inputs and removing ownership are not a promise to restore previous settings.
+If you need different remote values, set and apply those values explicitly before relinquishing ownership.
+
+[dns_settings_resource]: https://developers.cloudflare.com/api/terraform/resources/dns/subresources/settings/subresources/zone/
+
 ## Records and defaults
 
 Map keys identify records or groups of records in Terraform. Keep them stable when names or content change; use a `moved` block when changing a key.
@@ -331,9 +385,11 @@ records = {
 | ---- | ----------- | ---- | ------- | :------: |
 | <a name="input_account_id"></a> [account\_id](#input\_account\_id) | Account ID required for a managed zone, or an optional account filter for a zone\_name lookup. For advanced lookups use zone\_filter.account instead. | `string` | `null` | no |
 | <a name="input_create"></a> [create](#input\_create) | Whether to manage DNS resources and perform zone lookups. Disabling an existing module plans destruction of its managed records, DNSSEC configuration, and any managed zone. | `bool` | `true` | no |
+| <a name="input_create_dns_settings"></a> [create\_dns\_settings](#input\_create\_dns\_settings) | Whether to manage zone-wide DNS settings, independently of zone and DNSSEC ownership. Settings affect all records in the zone, including records outside this module. | `bool` | `false` | no |
 | <a name="input_create_dnssec"></a> [create\_dnssec](#input\_create\_dnssec) | Whether to manage DNSSEC for the selected zone, independently of zone ownership. Set dnssec.status to active to enable signing. Removing managed DNSSEC invokes provider deletion; coordinate parent DS removal first. | `bool` | `false` | no |
 | <a name="input_create_zone"></a> [create\_zone](#input\_create\_zone) | Whether to manage the zone itself. Requires zone\_name and account\_id; excludes zone\_id and zone\_filter. Import an existing zone before applying to adopt it. | `bool` | `false` | no |
 | <a name="input_defaults"></a> [defaults](#input\_defaults) | Record defaults. Non-null per-record values override these; empty comments, empty tags, and empty settings explicitly override defaults. Settings are replaced as a whole. | ```object({ comment = optional(string) include_shadow_metadata = optional(bool) private_routing = optional(bool) proxied = optional(bool, false) tags = optional(set(string)) ttl = optional(number, 1) settings = optional(object({ flatten_cname = optional(bool) ipv4_only = optional(bool) ipv6_only = optional(bool) })) })``` | `{}` | no |
+| <a name="input_dns_settings"></a> [dns\_settings](#input\_dns\_settings) | Zone-wide DNS settings, requiring create\_dns\_settings = true. Null properties defer to the provider; false, zero, and empty nested objects are passed through. Zone mode and nameserver type are trimmed/lowercased. foundation\_dns is deprecated upstream; prefer nameservers.type. | ```object({ flatten_all_cnames = optional(bool) foundation_dns = optional(bool) multi_provider = optional(bool) ns_ttl = optional(number) secondary_overrides = optional(bool) zone_mode = optional(string) internal_dns = optional(object({ reference_zone_id = optional(string) })) nameservers = optional(object({ type = string ns_set = optional(number) nameserver_set_id = optional(string) })) soa = optional(object({ expire = optional(number) min_ttl = optional(number) mname = optional(string) refresh = optional(number) retry = optional(number) rname = optional(string) ttl = optional(number) })) })``` | `{}` | no |
 | <a name="input_dnssec"></a> [dnssec](#input\_dnssec) | DNSSEC properties, requiring create\_dnssec = true. Status accepts active or disabled and is trimmed/lowercased. Null properties defer to the provider; explicit false values are preserved. Registrar or parent-zone DS publication is managed separately. | ```object({ status = optional(string) dnssec_multi_signer = optional(bool) dnssec_presigned = optional(bool) dnssec_use_nsec3 = optional(bool) })``` | `{}` | no |
 | <a name="input_records"></a> [records](#input\_records) | DNS records keyed by stable identifiers. Set name explicitly, or omit it to use the key. Content accepts a scalar or a list; MX list entries support a priority followed by a hostname. Supply exactly one of content or data. Full typed fields are defined in modules/record-inputs/variables.tf. | `any` | `{}` | no |
 | <a name="input_zone"></a> [zone](#input\_zone) | Optional managed-zone properties. Only supported with create\_zone = true. Null values defer to the provider; an empty vanity\_name\_servers list explicitly clears custom nameservers. | ```object({ paused = optional(bool) type = optional(string) vanity_name_servers = optional(list(string)) })``` | `{}` | no |
@@ -345,6 +401,7 @@ records = {
 
 | Name | Description |
 | ---- | ----------- |
+| <a name="output_dns_settings"></a> [dns\_settings](#output\_dns\_settings) | Complete managed zone DNS settings, retaining all upstream fields. Null when DNS settings are unmanaged or the module is disabled. |
 | <a name="output_dnssec"></a> [dnssec](#output\_dnssec) | Complete managed DNSSEC resource, including status, signing settings, DS, digest, key metadata, and public key. Null when DNSSEC is unmanaged or the module is disabled. |
 | <a name="output_dnssec_ds"></a> [dnssec\_ds](#output\_dnssec\_ds) | Full DS record for publication through the registrar or parent zone. Null when DNSSEC is unmanaged or the module is disabled. Availability otherwise follows the provider. |
 | <a name="output_name_servers"></a> [name\_servers](#output\_name\_servers) | Cloudflare-assigned nameservers for the managed or looked-up zone. Null in direct zone\_id mode or when disabled. Registrar delegation is managed separately. |

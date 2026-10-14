@@ -15,6 +15,9 @@ locals {
     var.dnssec.status == null, var.dnssec.dnssec_multi_signer == null,
     var.dnssec.dnssec_presigned == null, var.dnssec.dnssec_use_nsec3 == null
   ])
+  dns_settings_options_valid = !var.create || var.create_dns_settings || alltrue([
+    for value in var.dns_settings : value == null
+  ])
 
   zone_id = !var.create ? null : (
     var.create_zone ? cloudflare_zone.this[0].id : (local.lookup_zone ? data.cloudflare_zone.this[0].id : var.zone_id)

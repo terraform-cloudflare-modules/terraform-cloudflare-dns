@@ -1,5 +1,38 @@
 mock_provider "cloudflare" {}
 
+run "unknown_existing_zone_id_and_dns_settings" {
+  command = plan
+  module {
+    source = "./tests/fixtures/unknown"
+  }
+  variables {
+    create_dns_settings = true
+  }
+  assert {
+    condition     = output.dns_settings != null && output.dns_settings.zone_mode == "standard" && contains(output.record_keys, "stable_key")
+    error_message = "Unknown IDs and setting flags must not prevent planning DNS settings or stable record addresses."
+  }
+}
+
+run "unknown_managed_zone_with_dns_settings_and_dnssec" {
+  command = plan
+  module {
+    source = "./tests/fixtures/unknown"
+  }
+  variables {
+    create_zone         = true
+    create_dnssec       = true
+    create_dns_settings = true
+  }
+  assert {
+    condition = (
+      output.dns_settings != null && output.dns_settings.zone_mode == "standard" &&
+      output.dnssec != null && output.dnssec.status == "active" && output.record_name == "www.example.com"
+    )
+    error_message = "A new zone with an unknown account and ID must support DNS settings, DNSSEC, and records together."
+  }
+}
+
 run "unknown_existing_zone_id_and_dnssec_setting" {
   command = plan
   module {

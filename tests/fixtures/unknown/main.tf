@@ -26,6 +26,12 @@ variable "create_dnssec" {
   default     = false
 }
 
+variable "create_dns_settings" {
+  description = "Exercise DNS settings with an unknown zone ID and flag."
+  type        = bool
+  default     = false
+}
+
 resource "terraform_data" "multi_signer" {
   input = false
 }
@@ -49,6 +55,12 @@ module "dns" {
   dnssec = var.create_dnssec ? {
     status              = "active"
     dnssec_multi_signer = terraform_data.multi_signer.output
+  } : {}
+
+  create_dns_settings = var.create_dns_settings
+  dns_settings = var.create_dns_settings ? {
+    zone_mode      = "standard"
+    multi_provider = terraform_data.multi_signer.output
   } : {}
 
   records = merge({
@@ -93,4 +105,9 @@ output "zone" {
 output "dnssec" {
   description = "DNSSEC resource while its zone ID and signing setting are unknown."
   value       = module.dns.dnssec
+}
+
+output "dns_settings" {
+  description = "DNS settings while the zone ID and multi-provider flag are unknown."
+  value       = module.dns.dns_settings
 }

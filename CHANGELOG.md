@@ -25,6 +25,7 @@ as described in docs/UPGRADING.md before upgrading existing consumers.
 
 ### Improvements
 
+- Add opt-in zone DNS settings with nested SOA, nameserver, and internal DNS properties and complete outputs.
 - Add opt-in DNSSEC management, all signing settings, complete outputs, and parent DS/adoption guidance.
 - Support list-valued content with per-value MX priorities while retaining scalar addresses.
 - Use explicit DNS names in examples and document key-based naming separately.

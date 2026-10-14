@@ -47,6 +47,59 @@ variable "dnssec" {
   }
 }
 
+variable "create_dns_settings" {
+  description = "Whether to manage zone-wide DNS settings, independently of zone and DNSSEC ownership. Settings affect all records in the zone, including records outside this module."
+  type        = bool
+  default     = false
+  nullable    = false
+}
+
+variable "dns_settings" {
+  description = "Zone-wide DNS settings, requiring create_dns_settings = true. Null properties defer to the provider; false, zero, and empty nested objects are passed through. Zone mode and nameserver type are trimmed/lowercased. foundation_dns is deprecated upstream; prefer nameservers.type."
+  type = object({
+    flatten_all_cnames  = optional(bool)
+    foundation_dns      = optional(bool)
+    multi_provider      = optional(bool)
+    ns_ttl              = optional(number)
+    secondary_overrides = optional(bool)
+    zone_mode           = optional(string)
+    internal_dns = optional(object({
+      reference_zone_id = optional(string)
+    }))
+    nameservers = optional(object({
+      type              = string
+      ns_set            = optional(number)
+      nameserver_set_id = optional(string)
+    }))
+    soa = optional(object({
+      expire  = optional(number)
+      min_ttl = optional(number)
+      mname   = optional(string)
+      refresh = optional(number)
+      retry   = optional(number)
+      rname   = optional(string)
+      ttl     = optional(number)
+    }))
+  })
+  default  = {}
+  nullable = false
+
+  validation {
+    condition     = var.dns_settings.zone_mode == null ? true : contains(["standard", "cdn_only", "dns_only"], lower(trimspace(var.dns_settings.zone_mode)))
+    error_message = "dns_settings.zone_mode must be null, standard, cdn_only, or dns_only."
+  }
+
+  validation {
+    condition     = var.dns_settings.nameservers == null ? true : try(length(trimspace(var.dns_settings.nameservers.type)) > 0, false)
+    error_message = "dns_settings.nameservers.type must be a nonempty string when nameservers is configured."
+  }
+
+  validation {
+    condition     = try(var.dns_settings.nameservers.ns_set, null) == null ? true : floor(var.dns_settings.nameservers.ns_set) == var.dns_settings.nameservers.ns_set
+    error_message = "dns_settings.nameservers.ns_set must be null or an integer."
+  }
+}
+
 variable "zone_id" {
   description = "Existing zone ID. Bypasses zone lookup; may be unknown until apply. Mutually exclusive with zone_name, zone_filter, and create_zone."
   type        = string

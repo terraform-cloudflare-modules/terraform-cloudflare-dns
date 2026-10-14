@@ -18,6 +18,10 @@ output "zone_id" {
     condition     = local.dnssec_options_valid
     error_message = "DNSSEC properties require create_dnssec = true. Zone selection alone does not manage DNSSEC."
   }
+  precondition {
+    condition     = local.dns_settings_options_valid
+    error_message = "DNS settings require create_dns_settings = true. Zone selection alone does not manage DNS settings."
+  }
 }
 
 output "zone_name" {
@@ -48,4 +52,9 @@ output "dnssec" {
 output "dnssec_ds" {
   description = "Full DS record for publication through the registrar or parent zone. Null when DNSSEC is unmanaged or the module is disabled. Availability otherwise follows the provider."
   value       = one(cloudflare_zone_dnssec.this[*].ds)
+}
+
+output "dns_settings" {
+  description = "Complete managed zone DNS settings, retaining all upstream fields. Null when DNS settings are unmanaged or the module is disabled."
+  value       = one(cloudflare_zone_dns_settings.this)
 }

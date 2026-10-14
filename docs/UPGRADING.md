@@ -159,20 +159,32 @@ run `formr schema . -o docs/SCHEMA.md` to generate it and
 `formr check . --report docs/SCHEMA.md` to check for drift. Use the same engine
 and provider selections recorded in the report's provenance.
 
+An existing `terraform providers schema -json` snapshot can be used without starting
+the provider: add `--schema-file secrets/schema.json` to both Formr commands.
+The current report was generated from such a snapshot, which does not record engine
+or provider versions. Regenerate it with version provenance before publication.
+
 The current default policy checks inventory completeness and unresolved
 analysis. Strict interface coverage and exception annotations are not yet
 implemented, so a passing default check does not approve omitted fields.
 Review every added, removed or changed provider property when updating versions.
-Every configurable DNS record and zone-filter field must remain reachable through
+Every configurable resource and zone-filter field must remain reachable through
 the typed inputs; computed fields remain available through the whole-object outputs.
 Provider authentication and other provider configuration belong to the caller.
+
+The data source's `zone_id` selector is deliberately omitted: direct IDs bypass
+lookup, while `zone_name` and `zone_filter` select zones through its filter.
+The current Formr analysis labels DNSSEC and DNS settings results as unused because
+it does not trace their `one(...)` outputs. Those outputs return complete resource
+objects; the tests check both their values and null behavior when unmanaged.
 
 The `data.flags` input deliberately accepts a string, with CAA/DNSKEY flags
 converted to numbers at the resource boundary and NAPTR flags kept as strings.
 Review this transformation and all name/default handling when assessing coverage.
 
 Regenerate README inputs/outputs with `terraform-docs -c .github/linters/.terraform-docs.yml .`.
-Resource IDs remain provider-managed. Deprecated fields are not reintroduced as new inputs.
+Resource IDs remain provider-managed. Removed provider fields are not reintroduced as inputs;
+still-configurable deprecated settings are identified with their preferred replacement.
 
 ## First v2 publication
 
@@ -236,8 +248,7 @@ Registrar nameserver delegation and DNSSEC DS publication are separate operation
 The managed-zone resource exposes every configurable property in the reviewed
 Cloudflare schema: `account.id`, `name`, `type`, `paused`, and `vanity_name_servers`.
 All computed properties are retained in `zone`; `name_servers` is a convenience output.
-The checked-in Formr report currently predates zone management and must be regenerated
-and checked with the installed provider before publication.
+The checked-in Formr report includes the managed-zone resource.
 
 ## Convert scalar content to a list
 
@@ -263,8 +274,8 @@ List identity is positional: append to preserve existing addresses. Reordering o
 inserting values updates the existing indexed resources. Use individually keyed
 scalar entries when each server needs an identity independent of its list position.
 The complete typed field schema is in `modules/record-inputs/variables.tf`; public
-validation still applies before normalization. Regenerate the Formr report after
-this input normalization change as well as the zone-management addition.
+validation still applies before normalization. The Formr report traces resource
+inputs through this normalization module.
 
 ## Adopt existing DNSSEC
 
@@ -303,5 +314,39 @@ as described in [Cloudflare's DNSSEC states documentation](https://developers.cl
 To relinquish ownership while retaining remote DNSSEC, move or remove the resource from state
 without destroying it before removing the module's DNSSEC configuration.
 
-Regenerate and check the Formr report with the installed provider to include
-`cloudflare_zone_dnssec`, alongside the pending zone and record-input changes.
+The Formr report includes all configurable `cloudflare_zone_dnssec` fields.
+
+## Adopt zone DNS settings
+
+Zone DNS settings default to unmanaged. Set `create_dns_settings = true` and supply
+the desired properties in `dns_settings`; the resource targets the module's selected zone.
+Record keys and addresses remain unchanged, and managing these settings does not require
+`create_zone` or `create_dnssec`.
+
+Read the zone's current DNS settings before the first apply and review the configured
+changes as zone-wide writes. These are not defaults limited to records in this module.
+Only set properties you intend to manage, including nested SOA and nameserver properties.
+Leave deprecated `foundation_dns` unset when using the replacement `nameservers.type` configuration.
+
+If a resource in the same state already manages the settings, move it rather than
+allowing two resources to write the same configuration:
+
+```hcl
+moved {
+  from = cloudflare_zone_dns_settings.existing
+  to   = module.dns.cloudflare_zone_dns_settings.this[0]
+}
+```
+
+Remove the old declaration and review the plan for unintended settings changes.
+For ownership in separate states, coordinate the state handoff before applying.
+Import support depends on the provider version; do not reuse the zone or DNSSEC import
+commands for this resource without checking its version-specific documentation.
+
+Setting `create_dns_settings = false` removes the settings resource from the configuration.
+Do not assume that removal or null inputs restore the values that preceded Terraform ownership.
+Apply any desired replacement settings explicitly before relinquishing ownership.
+The existing zone and record resources retain their own ownership controls.
+
+The Formr report includes all configurable `cloudflare_zone_dns_settings` fields.
+When supplying `dns_settings.nameservers`, its `type` is required by the provider schema.
