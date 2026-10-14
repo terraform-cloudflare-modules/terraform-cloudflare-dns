@@ -20,9 +20,9 @@ typed inputs, and access to every configurable DNS record property.
 
 This repository is the successor to `terraform-cloudflare-dns-record`. The v2 API manages individual records in one zone per module invocation,
 with optional zone, DNSSEC, zone-wide DNS settings, and load balancing management.
-Further DNS capabilities are planned as optional additions within this module's scope.
+Account-wide and shared DNS features are available through standalone submodules.
 
-**Release status:** v2.0.0 has been released. This branch includes newer, unreleased DNSSEC, DNS settings, load balancing, and zone-transfer features.
+**Release status:** v2.0.0 has been released. This branch includes newer, unreleased DNSSEC, DNS settings, load balancing, and standalone DNS submodules.
 Examples using these additions require a checkout containing them until a release includes them. Registry publication is separate from a GitHub release.
 The historical `v1.0.0` tag retains the original single-record API. Existing users should read the [v2 migration guide](docs/UPGRADING.md).
 
@@ -375,11 +375,16 @@ Replace the documentation IPs with reachable endpoints before applying the examp
 
 ## Standalone submodules
 
-The root module manages one zone and its DNS features. Independently managed,
-shared transfer infrastructure is available through [zone-transfers](modules/zone-transfers/README.md),
-which supports account-level ACLs, TSIG keys, peers, and incoming/outgoing transfers
-for multiple zones. Pass root module outputs such as `zone_id` into its transfer entries.
-It does not create zones or add resources to existing root module invocations.
+The root module manages one zone and its DNS features. Account-wide and shared
+resources have separate owners, so they can be reused across zone module instances:
+
+| Submodule | Ownership and composition |
+| --- | --- |
+| [account-settings](modules/account-settings/README.md) | One account's DNS-only enforcement and defaults for new zones. |
+| [zone-transfers](modules/zone-transfers/README.md) | Shared ACLs, TSIG keys, peers, and incoming/outgoing transfers for multiple zones. |
+
+These submodules are called independently; existing root module invocations do
+not acquire their resources. Gateway policies belong to a separate Zero Trust configuration.
 
 Submodule examples live under [`examples/modules`](examples/modules); root-module
 examples remain directly under `examples`.
