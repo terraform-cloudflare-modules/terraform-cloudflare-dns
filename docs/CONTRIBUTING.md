@@ -4,7 +4,7 @@
 
 Install Terraform or OpenTofu, pre-commit, terraform-docs, and TFLint, then run
 `pre-commit install` and `pre-commit run --all-files`.
-The hooks format Terraform, regenerate root-module documentation, validate configurations,
+The hooks format Terraform, regenerate root and input-helper documentation, validate configurations,
 and check workflows, spelling, Markdown, and secrets. Shared configuration lives in `.github/linters/`.
 
 Run `terraform init -backend=false`, `terraform validate`, and `terraform test`
@@ -16,6 +16,8 @@ Assert observable behavior and compatibility guarantees instead of repeating imp
 
 Keep generated provider coverage in `docs/SCHEMA.md` once the module is implemented.
 Use the Formr commands in [UPGRADING.md](UPGRADING.md) to regenerate and check the report.
+Generated `docs/SCHEMA.md` reports are excluded from Markdown linting in both CI and
+pre-commit because Formr controls their layout. Handwritten documentation retains the line-length limit.
 
 ## Continuous integration and releases
 

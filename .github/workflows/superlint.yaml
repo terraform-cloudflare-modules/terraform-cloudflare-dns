@@ -36,7 +36,8 @@ jobs:
           MULTI_STATUS: false
           ENABLE_GITHUB_PULL_REQUEST_SUMMARY_COMMENT: false
           VALIDATE_ALL_CODEBASE: true
-          FILTER_REGEX_EXCLUDE: (^|/)(CHANGELOG\.md|secrets/)
+          # Generated reports are not hand-formatted; keep linting authored docs.
+          FILTER_REGEX_EXCLUDE: (^|/)(CHANGELOG\.md$|docs/SCHEMA\.md$|secrets/)
           VALIDATE_GITHUB_ACTIONS: true
           VALIDATE_GITHUB_ACTIONS_ZIZMOR: true
           VALIDATE_JSON: true

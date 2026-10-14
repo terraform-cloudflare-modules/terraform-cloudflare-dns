@@ -47,5 +47,6 @@ run "reject_multiple_zone_selectors" {
     zone_id   = "023e105f4ecef8ad9ca31a8372d0c353"
     zone_name = "example.com"
   }
-  expect_failures = [data.cloudflare_zone.this, output.zone_id]
+  # The failed lookup precondition prevents evaluation of dependent outputs.
+  expect_failures = [data.cloudflare_zone.this]
 }

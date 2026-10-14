@@ -31,6 +31,8 @@ jobs:
           - engine: terraform
             version: 1.16.6
           - engine: tofu
+            version: 1.8.8
+          - engine: tofu
             version: 1.13.1
     steps:
       - name: Checkout

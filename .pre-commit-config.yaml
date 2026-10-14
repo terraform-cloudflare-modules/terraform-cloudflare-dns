@@ -13,7 +13,8 @@ repos:
     rev: v0.49.1
     hooks:
       - id: markdownlint
-        exclude: ^CHANGELOG\.md$
+        # Match Super-Linter's generated-document exclusions.
+        exclude: (^|/)(CHANGELOG\.md|docs/SCHEMA\.md)$
         args:
           - "-c"
           - ".github/linters/.markdown-lint.yml"
@@ -52,8 +53,8 @@ repos:
     hooks:
       - id: terraform_fmt
       - id: terraform_docs
-        # Document the public root module without generating fixture READMEs.
-        files: ^[^/]+\.tf$
+        # Document the root and typed input helper without fixture READMEs.
+        files: ^([^/]+|modules/record-inputs/[^/]+)\.tf$
         args:
           - "--args=--config=.github/linters/.terraform-docs.yml"
           - "--args=--lockfile=false"
