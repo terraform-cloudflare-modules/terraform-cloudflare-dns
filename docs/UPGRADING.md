@@ -350,3 +350,59 @@ The existing zone and record resources retain their own ownership controls.
 
 The Formr report includes all configurable `cloudflare_zone_dns_settings` fields.
 When supplying `dns_settings.nameservers`, its `type` is required by the provider schema.
+
+## Adopt load balancing
+
+All three resource maps default to empty. Existing zone and record addresses stay
+unchanged. Adding an entry opts into ownership; deleting an entry or setting
+`create = false` plans destruction. `enabled = false` on a balancer or pool retains
+ownership and changes its enabled state instead. Monitors have no enabled flag.
+
+Load balancers belong to the selected zone; pools and monitors belong to an account.
+The module's `account_id` now also supplies pools and monitors, including with a
+direct zone ID or a `zone_filter`. An entry's `account_id` takes precedence over
+this default. The lookup's `zone_filter.account` remains independent.
+Use account and zone IDs from the same intended deployment; the module does not
+perform additional account lookups to establish ownership of external IDs.
+
+For existing resources in the same state, retain their IDs with caller-root moves:
+
+```hcl
+moved {
+  from = cloudflare_load_balancer_monitor.health
+  to   = module.dns.cloudflare_load_balancer_monitor.this["https"]
+}
+
+moved {
+  from = cloudflare_load_balancer_pool.europe
+  to   = module.dns.cloudflare_load_balancer_pool.this["europe"]
+}
+
+moved {
+  from = cloudflare_load_balancer.api
+  to   = module.dns.cloudflare_load_balancer.this["api"]
+}
+```
+
+Remove the old declarations, copy all intended settings into the corresponding
+maps, and check that the plan preserves IDs. To retain an existing proxied balancer,
+explicitly set `proxied = true`: the module's default is DNS-only. Use `full_name`
+for an existing hostname to prevent adding a zone suffix twice. Pool and monitor
+references can use managed map keys or external IDs, including nested rule overrides.
+
+A DNS record and a load balancer are distinct resources. Do not move a
+`cloudflare_dns_record` into a load balancer address. Cloudflare creates the load
+balancer's DNS entry itself; review existing records at that hostname and their
+fallback behavior before enabling or disabling balancing.
+
+Pools and monitors can serve multiple zones. Keep one owner for each shared
+resource and pass output IDs to other module instances. When ownership moves
+between states, coordinate the handoff before applying. For unmanaged remote
+resources, use the import procedure documented for the installed provider version
+and the resource type; zone-scoped and account-scoped import identifiers differ.
+
+The Formr report includes every configurable field of the balancer, pool, and
+monitor resources in the supplied schema. Native mock tests cover references,
+ordered steering rules, explicit empty values, and unknown resource IDs. Before
+production adoption, verify health checks, DNS answers by region, failover, a
+second no-change plan, and deletion behavior using a dedicated test hostname.

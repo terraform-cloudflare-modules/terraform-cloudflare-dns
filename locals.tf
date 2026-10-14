@@ -6,7 +6,9 @@ locals {
     (var.zone_id != null ? 1 : 0) + (var.zone_name != null ? 1 : 0) + (var.zone_filter != null ? 1 : 0) == 1
   )
   account_selection_valid = !var.create || (
-    var.create_zone ? var.account_id != null : (var.account_id == null || var.zone_name != null)
+    var.create_zone ? var.account_id != null : (
+      var.account_id == null || var.zone_name != null || length(var.load_balancer_pools) > 0 || length(var.load_balancer_monitors) > 0
+    )
   )
   zone_options_valid = !var.create || var.create_zone || alltrue([
     var.zone.paused == null, var.zone.type == null, var.zone.vanity_name_servers == null
@@ -88,5 +90,79 @@ locals {
       )
       priority = local.mx_values[instance.key] != null ? tonumber(local.mx_values[instance.key][0]) : local.normalized_records[instance.group].priority
     }) if var.create
+  }
+}
+
+locals {
+  load_balancer_monitor_ids = { for key, monitor in cloudflare_load_balancer_monitor.this : key => monitor.id }
+  load_balancer_pool_ids    = { for key, pool in cloudflare_load_balancer_pool.this : key => pool.id }
+  load_balancer_relative_names = {
+    for key, balancer in var.load_balancers : key => lower(trimsuffix(trimspace(balancer.name != null ? balancer.name : key), "."))
+  }
+  load_balancer_names = {
+    for key, balancer in var.load_balancers : key => (
+      balancer.full_name != null ? lower(trimsuffix(trimspace(balancer.full_name), ".")) : (
+        contains(["", "@"], local.load_balancer_relative_names[key]) ? (local.zone_name != null ? local.zone_name : "@") : (
+          local.zone_name != null ? "${local.load_balancer_relative_names[key]}.${local.zone_name}" : local.load_balancer_relative_names[key]
+        )
+      )
+    )
+  }
+
+  # Resolve the same pool references in base settings and per-rule overrides.
+  # JSON tuple keys separate base settings from ordered rules without collisions.
+  load_balancer_pool_references = merge(
+    { for key, balancer in var.load_balancers : jsonencode([key]) => {
+      default_pools   = balancer.default_pools
+      fallback_pool   = balancer.fallback_pool
+      country_pools   = balancer.country_pools
+      region_pools    = balancer.region_pools
+      pop_pools       = balancer.pop_pools
+      random_steering = balancer.random_steering
+    } },
+    { for entry in flatten([
+      for key, balancer in var.load_balancers : [
+        for index, rule in(balancer.rules == null ? [] : balancer.rules) : {
+          key       = jsonencode([key, index])
+          overrides = rule.overrides
+        } if rule.overrides != null
+      ]
+      ]) : entry.key => {
+      default_pools   = entry.overrides.default_pools
+      fallback_pool   = entry.overrides.fallback_pool
+      country_pools   = entry.overrides.country_pools
+      region_pools    = entry.overrides.region_pools
+      pop_pools       = entry.overrides.pop_pools
+      random_steering = entry.overrides.random_steering
+    } }
+  )
+  resolved_pool_references = {
+    for key, config in local.load_balancer_pool_references : key => {
+      default_pools = config.default_pools == null ? null : [
+        for pool in config.default_pools : lookup(local.load_balancer_pool_ids, pool, pool)
+      ]
+      fallback_pool = config.fallback_pool == null ? null : lookup(local.load_balancer_pool_ids, config.fallback_pool, config.fallback_pool)
+      country_pools = config.country_pools == null ? null : {
+        for location, pools in config.country_pools : location => [for pool in pools : lookup(local.load_balancer_pool_ids, pool, pool)]
+      }
+      region_pools = config.region_pools == null ? null : {
+        for location, pools in config.region_pools : location => [for pool in pools : lookup(local.load_balancer_pool_ids, pool, pool)]
+      }
+      pop_pools = config.pop_pools == null ? null : {
+        for location, pools in config.pop_pools : location => [for pool in pools : lookup(local.load_balancer_pool_ids, pool, pool)]
+      }
+      random_steering = config.random_steering == null ? null : merge(config.random_steering, {
+        pool_weights = config.random_steering.pool_weights == null ? null : {
+          for pool, weight in config.random_steering.pool_weights : lookup(local.load_balancer_pool_ids, pool, pool) => weight
+        }
+      })
+    }
+  }
+  load_balancer_rules = {
+    for key, balancer in var.load_balancers : key => balancer.rules == null ? null : [
+      for index, rule in balancer.rules : merge(rule, {
+        overrides = rule.overrides == null ? null : merge(rule.overrides, local.resolved_pool_references[jsonencode([key, index])])
+      })
+    ]
   }
 }

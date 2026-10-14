@@ -1,5 +1,44 @@
 mock_provider "cloudflare" {}
 
+run "unknown_load_balancing_ids_preserve_keys" {
+  command = plan
+  module {
+    source = "./tests/fixtures/unknown"
+  }
+  variables {
+    load_balancing = true
+  }
+  assert {
+    condition = (
+      length(output.load_balancers) == 1 && output.load_balancers.api.name == "api.example.com" &&
+      length(output.load_balancers.api.default_pools) == 2 && !output.load_balancers.api.proxied &&
+      length(output.load_balancer_pools) == 1 && output.load_balancer_pools.primary.name == "primary" &&
+      length(output.load_balancer_monitors) == 1 && output.load_balancer_monitors.health.type == "https"
+    )
+    error_message = "Unknown IDs, origin values, weight-map keys, and rule references must not affect resource identities or unrelated known properties."
+  }
+}
+
+run "unknown_managed_zone_with_load_balancing" {
+  command = plan
+  module {
+    source = "./tests/fixtures/unknown"
+  }
+  variables {
+    load_balancing      = true
+    create_zone         = true
+    create_dnssec       = true
+    create_dns_settings = true
+  }
+  assert {
+    condition = (
+      output.load_balancers.api.name == "api.example.com" && output.load_balancer_pools.primary.name == "primary" &&
+      output.dnssec.status == "active" && output.dns_settings.zone_mode == "standard" && output.record_name == "www.example.com"
+    )
+    error_message = "Load balancing must plan alongside a new zone, DNSSEC, DNS settings, and unchanged record addresses."
+  }
+}
+
 run "unknown_existing_zone_id_and_dns_settings" {
   command = plan
   module {

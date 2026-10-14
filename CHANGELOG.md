@@ -25,6 +25,7 @@ as described in docs/UPGRADING.md before upgrading existing consumers.
 
 ### Improvements
 
+- Add DNS-only load balancing, geographic and weighted steering, pools, and health monitors with complete upstream inputs and key-or-ID references.
 - Add opt-in zone DNS settings with nested SOA, nameserver, and internal DNS properties and complete outputs.
 - Add opt-in DNSSEC management, all signing settings, complete outputs, and parent DS/adoption guidance.
 - Support list-valued content with per-value MX priorities while retaining scalar addresses.

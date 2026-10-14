@@ -27,3 +27,18 @@ output "dns_settings" {
   description = "Complete zone-wide DNS settings."
   value       = module.dns.dns_settings
 }
+
+output "load_balancers" {
+  description = "Complete load balancer resources, including resolved geographic pool references."
+  value       = module.dns.load_balancers
+}
+
+output "load_balancer_pools" {
+  description = "Account-level pools and their Cloudflare IDs."
+  value       = module.dns.load_balancer_pools
+}
+
+output "load_balancer_monitors" {
+  description = "Account-level health monitors and their Cloudflare IDs."
+  value       = module.dns.load_balancer_monitors
+}

@@ -123,7 +123,7 @@ variable "zone_name" {
 }
 
 variable "account_id" {
-  description = "Account ID required for a managed zone, or an optional account filter for a zone_name lookup. For advanced lookups use zone_filter.account instead."
+  description = "Account ID required for a managed zone, an optional account filter for a zone_name lookup, and the default account for load balancing pools/monitors. For advanced lookups use zone_filter.account instead."
   type        = string
   default     = null
 
@@ -134,7 +134,7 @@ variable "account_id" {
 }
 
 variable "zone_filter" {
-  description = "Complete cloudflare_zone lookup filter. Must match exactly one zone. Mutually exclusive with zone_id, zone_name, and account_id. Filter strings, including operators, are passed through unchanged."
+  description = "Complete cloudflare_zone lookup filter. Must match exactly one zone. Mutually exclusive with zone_id and zone_name. Use filter.account for lookup filtering; account_id can separately supply load balancing pools/monitors. Filter strings pass through unchanged."
   type = object({
     account = optional(object({
       id   = optional(string)
@@ -256,5 +256,201 @@ variable "records" {
       )
     )])
     error_message = "CAA and DNSKEY data.flags must be numeric. NAPTR flags may be text."
+  }
+}
+
+variable "load_balancers" {
+  description = "Load balancers keyed by stable identifiers. Names follow record name/full_name rules. Pool references accept managed pool keys or existing IDs, including rule overrides and weight-map keys. Defaults to DNS-only (proxied = false); all upstream settings remain configurable."
+  type = map(object({
+    adaptive_routing = optional(object({
+      failover_across_pools = optional(bool)
+    }))
+    country_pools = optional(map(list(string)))
+    default_pools = list(string)
+    description   = optional(string)
+    enabled       = optional(bool)
+    fallback_pool = string
+    location_strategy = optional(object({
+      mode       = optional(string)
+      prefer_ecs = optional(string)
+    }))
+    name      = optional(string)
+    networks  = optional(list(string))
+    pop_pools = optional(map(list(string)))
+    proxied   = optional(bool, false)
+    random_steering = optional(object({
+      default_weight = optional(number)
+      pool_weights   = optional(map(number))
+    }))
+    region_pools = optional(map(list(string)))
+    rules = optional(list(object({
+      condition = optional(string)
+      disabled  = optional(bool)
+      fixed_response = optional(object({
+        content_type = optional(string)
+        location     = optional(string)
+        message_body = optional(string)
+        status_code  = optional(number)
+      }))
+      name = optional(string)
+      overrides = optional(object({
+        adaptive_routing = optional(object({
+          failover_across_pools = optional(bool)
+        }))
+        country_pools = optional(map(list(string)))
+        default_pools = optional(list(string))
+        fallback_pool = optional(string)
+        location_strategy = optional(object({
+          mode       = optional(string)
+          prefer_ecs = optional(string)
+        }))
+        pop_pools = optional(map(list(string)))
+        random_steering = optional(object({
+          default_weight = optional(number)
+          pool_weights   = optional(map(number))
+        }))
+        region_pools     = optional(map(list(string)))
+        session_affinity = optional(string)
+        session_affinity_attributes = optional(object({
+          drain_duration         = optional(number)
+          headers                = optional(list(string))
+          require_all_headers    = optional(bool)
+          samesite               = optional(string)
+          secure                 = optional(string)
+          zero_downtime_failover = optional(string)
+        }))
+        session_affinity_ttl = optional(number)
+        steering_policy      = optional(string)
+        ttl                  = optional(number)
+      }))
+      priority   = optional(number)
+      terminates = optional(bool)
+    })))
+    session_affinity = optional(string)
+    session_affinity_attributes = optional(object({
+      drain_duration         = optional(number)
+      headers                = optional(list(string))
+      require_all_headers    = optional(bool)
+      samesite               = optional(string)
+      secure                 = optional(string)
+      zero_downtime_failover = optional(string)
+    }))
+    session_affinity_ttl = optional(number)
+    steering_policy      = optional(string)
+    ttl                  = optional(number)
+    full_name            = optional(string)
+  }))
+  default  = {}
+  nullable = false
+
+  validation {
+    condition     = alltrue([for key, value in var.load_balancers : length(trimspace(key)) > 0 && value != null])
+    error_message = "load_balancers must have nonempty keys and non-null objects."
+  }
+
+  validation {
+    condition     = alltrue([for balancer in var.load_balancers : (balancer.name == null || balancer.full_name == null)])
+    error_message = "A load balancer may set name or full_name, but not both."
+  }
+
+  validation {
+    condition = alltrue([for balancer in var.load_balancers : balancer.full_name == null ? true : (
+      length(trimsuffix(trimspace(balancer.full_name), ".")) > 0 && trimspace(balancer.full_name) != "@"
+    )])
+    error_message = "Load balancer full_name must be a nonempty DNS name; use name = \"@\" for the zone apex."
+  }
+
+  validation {
+    condition = alltrue([for balancer in var.load_balancers : try(
+      length(balancer.default_pools) > 0 && alltrue([for pool in balancer.default_pools : length(trimspace(pool)) > 0]) &&
+      length(trimspace(balancer.fallback_pool)) > 0, false
+    )])
+    error_message = "Load balancers require nonempty default_pools and a nonempty fallback_pool."
+  }
+}
+
+variable "load_balancer_pools" {
+  description = "Account-level pools keyed by stable identifiers. Name defaults to the key; account_id defaults to the module account_id. Monitor accepts a managed monitor key or an existing ID. All configurable upstream properties are available."
+  type = map(object({
+    account_id     = optional(string)
+    check_regions  = optional(list(string))
+    description    = optional(string)
+    enabled        = optional(bool)
+    health_sources = optional(list(string))
+    latitude       = optional(number)
+    load_shedding = optional(object({
+      default_percent = optional(number)
+      default_policy  = optional(string)
+      session_percent = optional(number)
+      session_policy  = optional(string)
+    }))
+    longitude          = optional(number)
+    minimum_origins    = optional(number)
+    monitor            = optional(string)
+    monitor_group      = optional(string)
+    name               = optional(string)
+    notification_email = optional(string)
+    notification_filter = optional(object({
+      origin = optional(object({
+        disable = optional(bool)
+        healthy = optional(bool)
+      }))
+      pool = optional(object({
+        disable = optional(bool)
+        healthy = optional(bool)
+      }))
+    }))
+    origin_steering = optional(object({
+      policy = optional(string)
+    }))
+    origins = list(object({
+      address       = optional(string)
+      enabled       = optional(bool)
+      flatten_cname = optional(bool)
+      header = optional(object({
+        host = optional(list(string))
+      }))
+      name               = optional(string)
+      port               = optional(number)
+      virtual_network_id = optional(string)
+      weight             = optional(number)
+    }))
+  }))
+  default  = {}
+  nullable = false
+
+  validation {
+    condition     = alltrue([for key, value in var.load_balancer_pools : length(trimspace(key)) > 0 && value != null])
+    error_message = "load_balancer_pools must have nonempty keys and non-null objects."
+  }
+}
+
+variable "load_balancer_monitors" {
+  description = "Account-level health monitors keyed by stable identifiers. account_id defaults to the module account_id. Monitor type and HTTP method are normalized; bodies, paths, headers, and other settings pass through unchanged."
+  type = map(object({
+    account_id       = optional(string)
+    allow_insecure   = optional(bool)
+    consecutive_down = optional(number)
+    consecutive_up   = optional(number)
+    description      = optional(string)
+    expected_body    = optional(string)
+    expected_codes   = optional(string)
+    follow_redirects = optional(bool)
+    header           = optional(map(list(string)))
+    interval         = optional(number)
+    method           = optional(string)
+    path             = optional(string)
+    port             = optional(number)
+    probe_zone       = optional(string)
+    retries          = optional(number)
+    timeout          = optional(number)
+    type             = optional(string)
+  }))
+  default  = {}
+  nullable = false
+
+  validation {
+    condition     = alltrue([for key, value in var.load_balancer_monitors : length(trimspace(key)) > 0 && value != null])
+    error_message = "load_balancer_monitors must have nonempty keys and non-null objects."
   }
 }

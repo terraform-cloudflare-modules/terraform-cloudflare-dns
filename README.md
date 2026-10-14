@@ -18,7 +18,8 @@
 A [Terraform module][module] to manage [Cloudflare][cloudflare] DNS with stable record keys,
 typed inputs, and access to every configurable DNS record property.
 
-This repository is the successor to `terraform-cloudflare-dns-record`. The v2 API manages individual records in one zone per module invocation, with optional zone, DNSSEC, and zone-wide DNS settings management.
+This repository is the successor to `terraform-cloudflare-dns-record`. The v2 API manages individual records in one zone per module invocation,
+with optional zone, DNSSEC, zone-wide DNS settings, and load balancing management.
 Further DNS capabilities are planned as optional additions within this module's scope.
 
 **Release status:** v2 is under development. The Registry source shown below is the intended v2 address; it must be published before Registry installation works.
@@ -87,7 +88,8 @@ With `create_zone = false` (the default), set exactly one selector when `create 
 | `zone_name` | Looks up the domain; optionally constrain it with `account_id`. |
 | `zone_filter` | Passes the complete upstream filter, including nested account filters and operators. It must select exactly one zone. |
 
-`account_id` is only valid with `zone_name`; use `zone_filter.account` for advanced lookups.
+For zone lookups, `account_id` filters `zone_name`; use `zone_filter.account` for advanced lookups.
+It also supplies the default account when configuring load balancing pools or monitors, including in direct `zone_id` mode.
 For example, replace `zone_name` and `account_id` with:
 
 ```hcl
@@ -265,6 +267,111 @@ If you need different remote values, set and apply those values explicitly befor
 
 [dns_settings_resource]: https://developers.cloudflare.com/api/terraform/resources/dns/subresources/settings/subresources/zone/
 
+## Load balancing and geographic steering
+
+Use `load_balancers`, `load_balancer_pools`, and `load_balancer_monitors` to manage
+Cloudflare Load Balancing alongside DNS records. Each map defaults to `{}` and opts
+into ownership independently. `create = false` suppresses all three maps.
+Load balancing requires the corresponding Cloudflare subscription; geographic and
+other advanced features depend on your account's entitlements.
+
+```hcl
+account_id = var.cloudflare_account_id
+
+load_balancer_monitors = {
+  https = {
+    type           = "https"
+    method         = "GET"
+    path           = "/health"
+    expected_codes = "2xx"
+    header         = { Host = ["api.example.com"] }
+  }
+}
+
+load_balancer_pools = {
+  europe = {
+    monitor       = "https"
+    check_regions = ["WEU"]
+    origins       = [{ name = "eu-primary", address = "192.0.2.10" }]
+  }
+  america = {
+    monitor       = "https"
+    check_regions = ["ENAM"]
+    origins       = [{ name = "us-primary", address = "192.0.2.20" }]
+  }
+}
+
+load_balancers = {
+  api = {
+    name            = "api"
+    default_pools   = ["europe", "america"]
+    fallback_pool   = "america"
+    steering_policy = "geo"
+    country_pools   = { DE = ["europe", "america"] }
+    region_pools    = { ENAM = ["america", "europe"] }
+    ttl             = 60
+  }
+}
+```
+
+Load balancers target the module's zone. Their `name` and `full_name` follow the
+record naming rules: names are trimmed and lowercased, relative names expand when
+the zone name is known, and omitting both uses the map key. In direct `zone_id`
+mode, use `full_name = "api.example.com"` to supply the complete hostname.
+Pool names default to their keys; explicit pool names are passed through unchanged.
+The three matching outputs return complete resource maps, including computed IDs.
+
+Pools and monitors are account-scoped and can be shared across zones. Set their
+`account_id` individually or inherit the module's `account_id`. This default also
+works with direct zone IDs and `zone_filter`; `zone_filter.account` remains the
+independent lookup filter. The module still requires a selected zone even when
+only pools or monitors are configured.
+
+| Reference | Accepted values |
+| --- | --- |
+| Pool `monitor` | A key in `load_balancer_monitors`, or an existing monitor ID. |
+| `default_pools`, `fallback_pool` | Keys in `load_balancer_pools`, existing pool IDs, or a mixture. Ordered lists retain failover priority. |
+| `country_pools`, `region_pools`, `pop_pools` | Location-to-pool lists using the same key-or-ID convention. Location codes pass through unchanged. |
+| `random_steering.pool_weights` | Map keys are managed pool keys or existing IDs; numeric weights pass through unchanged. |
+| `rules[*].overrides` | Pool references and weight-map keys resolve exactly as in the base configuration. Rule order is preserved. |
+| Pool `monitor_group` | An existing group ID. This module does not yet create monitor groups. |
+
+A matching managed key takes precedence over a literal ID. Unmatched strings are
+forwarded as IDs, so a misspelled key is rejected by the API rather than creating
+another resource. Avoid keys that collide with external IDs. To share pools or
+monitors between module instances, pass their output IDs to the consuming instance;
+only one instance should own each shared resource.
+Map keys must be known at plan time; account IDs, endpoint values, and generated
+resource IDs may be unknown. Reference dependencies order monitors, pools, and
+load balancers automatically. Zone DNS settings and DNSSEC precede load balancers.
+
+Every configurable property in the supplied provider schema is exposed, including
+nested rules, fixed responses, affinity, location strategy, adaptive routing,
+origin steering, load shedding, notifications, and monitor probes. The typed
+inputs below and [schema report](docs/SCHEMA.md) list all fields. Apart from the
+`proxied` default, optional null properties defer to the provider; explicit false,
+zero, empty collections, and empty optional objects pass
+through. Cloudflare validates supported combinations and plan restrictions.
+Top-level `steering_policy` and monitor `type` are trimmed and lowercased; monitor
+`method` is trimmed and uppercased. Rule expressions, responses, headers, and other
+payload values retain their original case and content.
+
+`proxied` defaults to false for [DNS-only balancing][lb_proxy]. It remains configurable,
+as do all proxy-specific fields, to preserve the upstream interface. DNS-only mode
+routes DNS answers; resolver caching affects failover, and HTTP session affinity
+requires proxied mode. [Geographic steering][lb_geo] maps countries, regions, or data
+centers to ordered pools; DNS-only location follows ECS or the recursive resolver.
+Cloudflare [creates the load balancer's DNS entry][lb_dns] automatically; a separate
+record is unnecessary. Existing same-hostname records can serve as fallback when
+the balancer is disabled, subject to Cloudflare's record precedence rules.
+
+See the [full example](examples/full/main.tf) and [adoption guide](docs/UPGRADING.md#adopt-load-balancing).
+Replace the documentation IPs with reachable endpoints before applying the example.
+
+[lb_proxy]: https://developers.cloudflare.com/load-balancing/understand-basics/proxy-modes/
+[lb_geo]: https://developers.cloudflare.com/load-balancing/understand-basics/traffic-steering/steering-policies/geo-steering/
+[lb_dns]: https://developers.cloudflare.com/load-balancing/load-balancers/dns-records/
+
 ## Records and defaults
 
 Map keys identify records or groups of records in Terraform. Keep them stable when names or content change; use a `moved` block when changing a key.
@@ -383,7 +490,7 @@ records = {
 
 | Name | Description | Type | Default | Required |
 | ---- | ----------- | ---- | ------- | :------: |
-| <a name="input_account_id"></a> [account\_id](#input\_account\_id) | Account ID required for a managed zone, or an optional account filter for a zone\_name lookup. For advanced lookups use zone\_filter.account instead. | `string` | `null` | no |
+| <a name="input_account_id"></a> [account\_id](#input\_account\_id) | Account ID required for a managed zone, an optional account filter for a zone\_name lookup, and the default account for load balancing pools/monitors. For advanced lookups use zone\_filter.account instead. | `string` | `null` | no |
 | <a name="input_create"></a> [create](#input\_create) | Whether to manage DNS resources and perform zone lookups. Disabling an existing module plans destruction of its managed records, DNSSEC configuration, and any managed zone. | `bool` | `true` | no |
 | <a name="input_create_dns_settings"></a> [create\_dns\_settings](#input\_create\_dns\_settings) | Whether to manage zone-wide DNS settings, independently of zone and DNSSEC ownership. Settings affect all records in the zone, including records outside this module. | `bool` | `false` | no |
 | <a name="input_create_dnssec"></a> [create\_dnssec](#input\_create\_dnssec) | Whether to manage DNSSEC for the selected zone, independently of zone ownership. Set dnssec.status to active to enable signing. Removing managed DNSSEC invokes provider deletion; coordinate parent DS removal first. | `bool` | `false` | no |
@@ -391,9 +498,12 @@ records = {
 | <a name="input_defaults"></a> [defaults](#input\_defaults) | Record defaults. Non-null per-record values override these; empty comments, empty tags, and empty settings explicitly override defaults. Settings are replaced as a whole. | ```object({ comment = optional(string) include_shadow_metadata = optional(bool) private_routing = optional(bool) proxied = optional(bool, false) tags = optional(set(string)) ttl = optional(number, 1) settings = optional(object({ flatten_cname = optional(bool) ipv4_only = optional(bool) ipv6_only = optional(bool) })) })``` | `{}` | no |
 | <a name="input_dns_settings"></a> [dns\_settings](#input\_dns\_settings) | Zone-wide DNS settings, requiring create\_dns\_settings = true. Null properties defer to the provider; false, zero, and empty nested objects are passed through. Zone mode and nameserver type are trimmed/lowercased. foundation\_dns is deprecated upstream; prefer nameservers.type. | ```object({ flatten_all_cnames = optional(bool) foundation_dns = optional(bool) multi_provider = optional(bool) ns_ttl = optional(number) secondary_overrides = optional(bool) zone_mode = optional(string) internal_dns = optional(object({ reference_zone_id = optional(string) })) nameservers = optional(object({ type = string ns_set = optional(number) nameserver_set_id = optional(string) })) soa = optional(object({ expire = optional(number) min_ttl = optional(number) mname = optional(string) refresh = optional(number) retry = optional(number) rname = optional(string) ttl = optional(number) })) })``` | `{}` | no |
 | <a name="input_dnssec"></a> [dnssec](#input\_dnssec) | DNSSEC properties, requiring create\_dnssec = true. Status accepts active or disabled and is trimmed/lowercased. Null properties defer to the provider; explicit false values are preserved. Registrar or parent-zone DS publication is managed separately. | ```object({ status = optional(string) dnssec_multi_signer = optional(bool) dnssec_presigned = optional(bool) dnssec_use_nsec3 = optional(bool) })``` | `{}` | no |
+| <a name="input_load_balancer_monitors"></a> [load\_balancer\_monitors](#input\_load\_balancer\_monitors) | Account-level health monitors keyed by stable identifiers. account\_id defaults to the module account\_id. Monitor type and HTTP method are normalized; bodies, paths, headers, and other settings pass through unchanged. | ```map(object({ account_id = optional(string) allow_insecure = optional(bool) consecutive_down = optional(number) consecutive_up = optional(number) description = optional(string) expected_body = optional(string) expected_codes = optional(string) follow_redirects = optional(bool) header = optional(map(list(string))) interval = optional(number) method = optional(string) path = optional(string) port = optional(number) probe_zone = optional(string) retries = optional(number) timeout = optional(number) type = optional(string) }))``` | `{}` | no |
+| <a name="input_load_balancer_pools"></a> [load\_balancer\_pools](#input\_load\_balancer\_pools) | Account-level pools keyed by stable identifiers. Name defaults to the key; account\_id defaults to the module account\_id. Monitor accepts a managed monitor key or an existing ID. All configurable upstream properties are available. | ```map(object({ account_id = optional(string) check_regions = optional(list(string)) description = optional(string) enabled = optional(bool) health_sources = optional(list(string)) latitude = optional(number) load_shedding = optional(object({ default_percent = optional(number) default_policy = optional(string) session_percent = optional(number) session_policy = optional(string) })) longitude = optional(number) minimum_origins = optional(number) monitor = optional(string) monitor_group = optional(string) name = optional(string) notification_email = optional(string) notification_filter = optional(object({ origin = optional(object({ disable = optional(bool) healthy = optional(bool) })) pool = optional(object({ disable = optional(bool) healthy = optional(bool) })) })) origin_steering = optional(object({ policy = optional(string) })) origins = list(object({ address = optional(string) enabled = optional(bool) flatten_cname = optional(bool) header = optional(object({ host = optional(list(string)) })) name = optional(string) port = optional(number) virtual_network_id = optional(string) weight = optional(number) })) }))``` | `{}` | no |
+| <a name="input_load_balancers"></a> [load\_balancers](#input\_load\_balancers) | Load balancers keyed by stable identifiers. Names follow record name/full\_name rules. Pool references accept managed pool keys or existing IDs, including rule overrides and weight-map keys. Defaults to DNS-only (proxied = false); all upstream settings remain configurable. | ```map(object({ adaptive_routing = optional(object({ failover_across_pools = optional(bool) })) country_pools = optional(map(list(string))) default_pools = list(string) description = optional(string) enabled = optional(bool) fallback_pool = string location_strategy = optional(object({ mode = optional(string) prefer_ecs = optional(string) })) name = optional(string) networks = optional(list(string)) pop_pools = optional(map(list(string))) proxied = optional(bool, false) random_steering = optional(object({ default_weight = optional(number) pool_weights = optional(map(number)) })) region_pools = optional(map(list(string))) rules = optional(list(object({ condition = optional(string) disabled = optional(bool) fixed_response = optional(object({ content_type = optional(string) location = optional(string) message_body = optional(string) status_code = optional(number) })) name = optional(string) overrides = optional(object({ adaptive_routing = optional(object({ failover_across_pools = optional(bool) })) country_pools = optional(map(list(string))) default_pools = optional(list(string)) fallback_pool = optional(string) location_strategy = optional(object({ mode = optional(string) prefer_ecs = optional(string) })) pop_pools = optional(map(list(string))) random_steering = optional(object({ default_weight = optional(number) pool_weights = optional(map(number)) })) region_pools = optional(map(list(string))) session_affinity = optional(string) session_affinity_attributes = optional(object({ drain_duration = optional(number) headers = optional(list(string)) require_all_headers = optional(bool) samesite = optional(string) secure = optional(string) zero_downtime_failover = optional(string) })) session_affinity_ttl = optional(number) steering_policy = optional(string) ttl = optional(number) })) priority = optional(number) terminates = optional(bool) }))) session_affinity = optional(string) session_affinity_attributes = optional(object({ drain_duration = optional(number) headers = optional(list(string)) require_all_headers = optional(bool) samesite = optional(string) secure = optional(string) zero_downtime_failover = optional(string) })) session_affinity_ttl = optional(number) steering_policy = optional(string) ttl = optional(number) full_name = optional(string) }))``` | `{}` | no |
 | <a name="input_records"></a> [records](#input\_records) | DNS records keyed by stable identifiers. Set name explicitly, or omit it to use the key. Content accepts a scalar or a list; MX list entries support a priority followed by a hostname. Supply exactly one of content or data. Full typed fields are defined in modules/record-inputs/variables.tf. | `any` | `{}` | no |
 | <a name="input_zone"></a> [zone](#input\_zone) | Optional managed-zone properties. Only supported with create\_zone = true. Null values defer to the provider; an empty vanity\_name\_servers list explicitly clears custom nameservers. | ```object({ paused = optional(bool) type = optional(string) vanity_name_servers = optional(list(string)) })``` | `{}` | no |
-| <a name="input_zone_filter"></a> [zone\_filter](#input\_zone\_filter) | Complete cloudflare\_zone lookup filter. Must match exactly one zone. Mutually exclusive with zone\_id, zone\_name, and account\_id. Filter strings, including operators, are passed through unchanged. | ```object({ account = optional(object({ id = optional(string) name = optional(string) })) direction = optional(string) match = optional(string) name = optional(string) order = optional(string) status = optional(string) type = optional(list(string)) })``` | `null` | no |
+| <a name="input_zone_filter"></a> [zone\_filter](#input\_zone\_filter) | Complete cloudflare\_zone lookup filter. Must match exactly one zone. Mutually exclusive with zone\_id and zone\_name. Use filter.account for lookup filtering; account\_id can separately supply load balancing pools/monitors. Filter strings pass through unchanged. | ```object({ account = optional(object({ id = optional(string) name = optional(string) })) direction = optional(string) match = optional(string) name = optional(string) order = optional(string) status = optional(string) type = optional(list(string)) })``` | `null` | no |
 | <a name="input_zone_id"></a> [zone\_id](#input\_zone\_id) | Existing zone ID. Bypasses zone lookup; may be unknown until apply. Mutually exclusive with zone\_name, zone\_filter, and create\_zone. | `string` | `null` | no |
 | <a name="input_zone_name"></a> [zone\_name](#input\_zone\_name) | Zone name to create/manage when create\_zone is true, or look up otherwise. Mutually exclusive with zone\_id and zone\_filter. Use Punycode for internationalized names. | `string` | `null` | no |
 
@@ -404,6 +514,9 @@ records = {
 | <a name="output_dns_settings"></a> [dns\_settings](#output\_dns\_settings) | Complete managed zone DNS settings, retaining all upstream fields. Null when DNS settings are unmanaged or the module is disabled. |
 | <a name="output_dnssec"></a> [dnssec](#output\_dnssec) | Complete managed DNSSEC resource, including status, signing settings, DS, digest, key metadata, and public key. Null when DNSSEC is unmanaged or the module is disabled. |
 | <a name="output_dnssec_ds"></a> [dnssec\_ds](#output\_dnssec\_ds) | Full DS record for publication through the registrar or parent zone. Null when DNSSEC is unmanaged or the module is disabled. Availability otherwise follows the provider. |
+| <a name="output_load_balancer_monitors"></a> [load\_balancer\_monitors](#output\_load\_balancer\_monitors) | Complete managed load balancer monitors keyed by the input keys, including computed properties. Empty when disabled or unconfigured. |
+| <a name="output_load_balancer_pools"></a> [load\_balancer\_pools](#output\_load\_balancer\_pools) | Complete managed load balancer pools keyed by the input keys, including computed properties. Empty when disabled or unconfigured. |
+| <a name="output_load_balancers"></a> [load\_balancers](#output\_load\_balancers) | Complete managed load balancers keyed by the input keys, including computed properties. Empty when disabled or unconfigured. |
 | <a name="output_name_servers"></a> [name\_servers](#output\_name\_servers) | Cloudflare-assigned nameservers for the managed or looked-up zone. Null in direct zone\_id mode or when disabled. Registrar delegation is managed separately. |
 | <a name="output_records"></a> [records](#output\_records) | Complete DNS resources keyed by the input key for scalar/structured entries, or key[index] for list content. Includes IDs, names, content, proxied (enabled), proxiable (capable), metadata, and timestamps. Empty when disabled. |
 | <a name="output_zone"></a> [zone](#output\_zone) | Complete managed zone or zone lookup result, preserving its upstream schema and computed properties. Null in direct zone\_id mode or when disabled. |

@@ -8,7 +8,7 @@ output "zone_id" {
   }
   precondition {
     condition     = local.account_selection_valid
-    error_message = "Managed zones require account_id. Otherwise account_id is only supported with zone_name; use zone_filter.account for advanced lookups."
+    error_message = "Managed zones require account_id. Otherwise account_id needs a zone_name lookup or load balancing pools/monitors; use zone_filter.account for advanced lookups."
   }
   precondition {
     condition     = local.zone_options_valid
@@ -57,4 +57,19 @@ output "dnssec_ds" {
 output "dns_settings" {
   description = "Complete managed zone DNS settings, retaining all upstream fields. Null when DNS settings are unmanaged or the module is disabled."
   value       = one(cloudflare_zone_dns_settings.this)
+}
+
+output "load_balancers" {
+  description = "Complete managed load balancers keyed by the input keys, including computed properties. Empty when disabled or unconfigured."
+  value       = cloudflare_load_balancer.this
+}
+
+output "load_balancer_pools" {
+  description = "Complete managed load balancer pools keyed by the input keys, including computed properties. Empty when disabled or unconfigured."
+  value       = cloudflare_load_balancer_pool.this
+}
+
+output "load_balancer_monitors" {
+  description = "Complete managed load balancer monitors keyed by the input keys, including computed properties. Empty when disabled or unconfigured."
+  value       = cloudflare_load_balancer_monitor.this
 }

@@ -38,6 +38,44 @@ module "dns" {
     tags = ["managed-by:terraform"]
   }
 
+  load_balancer_monitors = {
+    https = {
+      type           = "https"
+      method         = "GET"
+      path           = "/health"
+      expected_codes = "2xx"
+      header         = { Host = ["api.${var.zone_name}"] }
+    }
+  }
+
+  load_balancer_pools = {
+    europe = {
+      name          = "dns-example-europe"
+      monitor       = "https"
+      check_regions = ["WEU"]
+      origins       = [{ name = "europe", address = "192.0.2.10" }]
+    }
+    america = {
+      name          = "dns-example-america"
+      monitor       = "https"
+      check_regions = ["ENAM"]
+      origins       = [{ name = "america", address = "192.0.2.20" }]
+    }
+  }
+
+  load_balancers = {
+    api = {
+      name            = "api"
+      default_pools   = ["europe", "america"]
+      fallback_pool   = "america"
+      steering_policy = "geo"
+      country_pools   = { DE = ["europe", "america"] }
+      region_pools    = { ENAM = ["america", "europe"] }
+      proxied         = false
+      ttl             = 60
+    }
+  }
+
   records = {
     www = {
       name    = "www"

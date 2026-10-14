@@ -32,6 +32,12 @@ variable "create_dns_settings" {
   default     = false
 }
 
+variable "load_balancing" {
+  description = "Exercise load balancing with unknown accounts, resource IDs, endpoints, and flags."
+  type        = bool
+  default     = false
+}
+
 resource "terraform_data" "multi_signer" {
   input = false
 }
@@ -49,7 +55,28 @@ module "dns" {
   create_zone = var.create_zone
   zone_id     = var.create_zone ? null : terraform_data.zone.output
   zone_name   = var.create_zone ? "example.com" : null
-  account_id  = var.create_zone ? terraform_data.zone.output : null
+  account_id  = var.create_zone || var.load_balancing ? terraform_data.zone.output : null
+
+  load_balancer_monitors = var.load_balancing ? {
+    health = { type = "https", allow_insecure = terraform_data.multi_signer.output }
+  } : {}
+  load_balancer_pools = var.load_balancing ? {
+    primary = { monitor = "health", origins = [{ name = "primary", address = terraform_data.content.output }] }
+  } : {}
+  load_balancers = var.load_balancing ? {
+    api = {
+      full_name       = "api.example.com"
+      default_pools   = ["primary", terraform_data.zone.output]
+      fallback_pool   = "primary"
+      country_pools   = { DE = ["primary"] }
+      random_steering = { pool_weights = { primary = 1 } }
+      enabled         = terraform_data.multi_signer.output
+      rules = [{ overrides = {
+        default_pools   = ["primary"]
+        random_steering = { pool_weights = { primary = 1 } }
+      } }]
+    }
+  } : {}
 
   create_dnssec = var.create_dnssec
   dnssec = var.create_dnssec ? {
@@ -110,4 +137,19 @@ output "dnssec" {
 output "dns_settings" {
   description = "DNS settings while the zone ID and multi-provider flag are unknown."
   value       = module.dns.dns_settings
+}
+
+output "load_balancers" {
+  description = "Load balancers with unknown IDs and steering references."
+  value       = module.dns.load_balancers
+}
+
+output "load_balancer_pools" {
+  description = "Pools with unknown accounts, monitor IDs, and endpoint addresses."
+  value       = module.dns.load_balancer_pools
+}
+
+output "load_balancer_monitors" {
+  description = "Monitors with unknown accounts and flags."
+  value       = module.dns.load_balancer_monitors
 }

@@ -39,7 +39,7 @@ data "cloudflare_zone" "this" {
     }
     precondition {
       condition     = local.account_selection_valid
-      error_message = "Managed zones require account_id. Otherwise account_id is only supported with zone_name; use zone_filter.account for advanced lookups."
+      error_message = "Managed zones require account_id. Otherwise account_id needs a zone_name lookup or load balancing pools/monitors; use zone_filter.account for advanced lookups."
     }
   }
 }
@@ -67,7 +67,7 @@ resource "cloudflare_zone_dns_settings" "this" {
     }
     precondition {
       condition     = local.account_selection_valid
-      error_message = "Managed zones require account_id. Otherwise account_id is only supported with zone_name; use zone_filter.account for advanced lookups."
+      error_message = "Managed zones require account_id. Otherwise account_id needs a zone_name lookup or load balancing pools/monitors; use zone_filter.account for advanced lookups."
     }
   }
 }
@@ -88,7 +88,7 @@ resource "cloudflare_zone_dnssec" "this" {
     }
     precondition {
       condition     = local.account_selection_valid
-      error_message = "Managed zones require account_id. Otherwise account_id is only supported with zone_name; use zone_filter.account for advanced lookups."
+      error_message = "Managed zones require account_id. Otherwise account_id needs a zone_name lookup or load balancing pools/monitors; use zone_filter.account for advanced lookups."
     }
   }
 }
@@ -120,11 +120,106 @@ resource "cloudflare_dns_record" "this" {
     }
     precondition {
       condition     = local.account_selection_valid
-      error_message = "Managed zones require account_id. Otherwise account_id is only supported with zone_name; use zone_filter.account for advanced lookups."
+      error_message = "Managed zones require account_id. Otherwise account_id needs a zone_name lookup or load balancing pools/monitors; use zone_filter.account for advanced lookups."
     }
     precondition {
       condition     = !each.value.proxied || each.value.ttl == 1
       error_message = "Proxied records require ttl = 1 (automatic). Set the record ttl to 1 or change defaults.ttl."
+    }
+  }
+}
+
+resource "cloudflare_load_balancer_monitor" "this" {
+  for_each = { for key, value in var.load_balancer_monitors : key => value if var.create }
+
+  account_id       = each.value.account_id != null ? each.value.account_id : var.account_id
+  allow_insecure   = each.value.allow_insecure
+  consecutive_down = each.value.consecutive_down
+  consecutive_up   = each.value.consecutive_up
+  description      = each.value.description
+  expected_body    = each.value.expected_body
+  expected_codes   = each.value.expected_codes
+  follow_redirects = each.value.follow_redirects
+  header           = each.value.header
+  interval         = each.value.interval
+  method           = each.value.method == null ? null : upper(trimspace(each.value.method))
+  path             = each.value.path
+  port             = each.value.port
+  probe_zone       = each.value.probe_zone
+  retries          = each.value.retries
+  timeout          = each.value.timeout
+  type             = each.value.type == null ? null : lower(trimspace(each.value.type))
+
+  lifecycle {
+    precondition {
+      condition     = try(length(trimspace(each.value.account_id != null ? each.value.account_id : var.account_id)) > 0, false)
+      error_message = "Each monitor requires account_id, either on the entry or at module level."
+    }
+  }
+}
+
+resource "cloudflare_load_balancer_pool" "this" {
+  for_each = { for key, value in var.load_balancer_pools : key => value if var.create }
+
+  account_id          = each.value.account_id != null ? each.value.account_id : var.account_id
+  check_regions       = each.value.check_regions
+  description         = each.value.description
+  enabled             = each.value.enabled
+  health_sources      = each.value.health_sources
+  latitude            = each.value.latitude
+  load_shedding       = each.value.load_shedding
+  longitude           = each.value.longitude
+  minimum_origins     = each.value.minimum_origins
+  monitor             = each.value.monitor == null ? null : lookup(local.load_balancer_monitor_ids, each.value.monitor, each.value.monitor)
+  monitor_group       = each.value.monitor_group
+  name                = (each.value.name != null ? each.value.name : each.key)
+  notification_email  = each.value.notification_email
+  notification_filter = each.value.notification_filter
+  origin_steering     = each.value.origin_steering
+  origins             = each.value.origins
+
+  lifecycle {
+    precondition {
+      condition     = try(length(trimspace(each.value.account_id != null ? each.value.account_id : var.account_id)) > 0, false)
+      error_message = "Each pool requires account_id, either on the entry or at module level."
+    }
+  }
+}
+
+resource "cloudflare_load_balancer" "this" {
+  for_each = { for key, value in var.load_balancers : key => value if var.create }
+
+  depends_on = [cloudflare_zone_dns_settings.this, cloudflare_zone_dnssec.this]
+
+  adaptive_routing            = each.value.adaptive_routing
+  country_pools               = local.resolved_pool_references[jsonencode([each.key])].country_pools
+  default_pools               = local.resolved_pool_references[jsonencode([each.key])].default_pools
+  description                 = each.value.description
+  enabled                     = each.value.enabled
+  fallback_pool               = local.resolved_pool_references[jsonencode([each.key])].fallback_pool
+  location_strategy           = each.value.location_strategy
+  name                        = local.load_balancer_names[each.key]
+  networks                    = each.value.networks
+  pop_pools                   = local.resolved_pool_references[jsonencode([each.key])].pop_pools
+  proxied                     = each.value.proxied
+  random_steering             = local.resolved_pool_references[jsonencode([each.key])].random_steering
+  region_pools                = local.resolved_pool_references[jsonencode([each.key])].region_pools
+  rules                       = local.load_balancer_rules[each.key]
+  session_affinity            = each.value.session_affinity
+  session_affinity_attributes = each.value.session_affinity_attributes
+  session_affinity_ttl        = each.value.session_affinity_ttl
+  steering_policy             = each.value.steering_policy == null ? null : lower(trimspace(each.value.steering_policy))
+  ttl                         = each.value.ttl
+  zone_id                     = local.zone_id
+
+  lifecycle {
+    precondition {
+      condition     = local.zone_selection_valid
+      error_message = "Load balancers require exactly one valid zone selector, or a managed zone."
+    }
+    precondition {
+      condition     = local.account_selection_valid
+      error_message = "account_id must select a managed zone, filter a zone_name lookup, or supply load balancing pools/monitors."
     }
   }
 }
