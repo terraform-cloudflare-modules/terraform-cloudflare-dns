@@ -1,5 +1,5 @@
 variable "create" {
-  description = "Whether to manage DNS resources and perform zone lookups. Disabling an existing module plans destruction of its managed records and any managed zone."
+  description = "Whether to manage DNS resources and perform zone lookups. Disabling an existing module plans destruction of its managed records, DNSSEC configuration, and any managed zone."
   type        = bool
   default     = true
   nullable    = false
@@ -21,6 +21,30 @@ variable "zone" {
   })
   default  = {}
   nullable = false
+}
+
+variable "create_dnssec" {
+  description = "Whether to manage DNSSEC for the selected zone, independently of zone ownership. Set dnssec.status to active to enable signing. Removing managed DNSSEC invokes provider deletion; coordinate parent DS removal first."
+  type        = bool
+  default     = false
+  nullable    = false
+}
+
+variable "dnssec" {
+  description = "DNSSEC properties, requiring create_dnssec = true. Status accepts active or disabled and is trimmed/lowercased. Null properties defer to the provider; explicit false values are preserved. Registrar or parent-zone DS publication is managed separately."
+  type = object({
+    status              = optional(string)
+    dnssec_multi_signer = optional(bool)
+    dnssec_presigned    = optional(bool)
+    dnssec_use_nsec3    = optional(bool)
+  })
+  default  = {}
+  nullable = false
+
+  validation {
+    condition     = var.dnssec.status == null ? true : contains(["active", "disabled"], lower(trimspace(var.dnssec.status)))
+    error_message = "dnssec.status must be null, active, or disabled. Pending states are API results, not desired configuration."
+  }
 }
 
 variable "zone_id" {

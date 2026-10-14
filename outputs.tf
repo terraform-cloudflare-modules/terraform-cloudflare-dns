@@ -14,6 +14,10 @@ output "zone_id" {
     condition     = local.zone_options_valid
     error_message = "Zone properties require create_zone = true. Existing-zone lookups do not manage zone properties."
   }
+  precondition {
+    condition     = local.dnssec_options_valid
+    error_message = "DNSSEC properties require create_dnssec = true. Zone selection alone does not manage DNSSEC."
+  }
 }
 
 output "zone_name" {
@@ -34,4 +38,14 @@ output "name_servers" {
 output "records" {
   description = "Complete DNS resources keyed by the input key for scalar/structured entries, or key[index] for list content. Includes IDs, names, content, proxied (enabled), proxiable (capable), metadata, and timestamps. Empty when disabled."
   value       = cloudflare_dns_record.this
+}
+
+output "dnssec" {
+  description = "Complete managed DNSSEC resource, including status, signing settings, DS, digest, key metadata, and public key. Null when DNSSEC is unmanaged or the module is disabled."
+  value       = one(cloudflare_zone_dnssec.this)
+}
+
+output "dnssec_ds" {
+  description = "Full DS record for publication through the registrar or parent zone. Null when DNSSEC is unmanaged or the module is disabled. Availability otherwise follows the provider."
+  value       = one(cloudflare_zone_dnssec.this[*].ds)
 }

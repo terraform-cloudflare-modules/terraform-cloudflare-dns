@@ -1,5 +1,34 @@
 mock_provider "cloudflare" {}
 
+run "unknown_existing_zone_id_and_dnssec_setting" {
+  command = plan
+  module {
+    source = "./tests/fixtures/unknown"
+  }
+  variables {
+    create_dnssec = true
+  }
+  assert {
+    condition     = output.dnssec != null && output.dnssec.status == "active" && contains(output.record_keys, "stable_key")
+    error_message = "Unknown zone IDs and signing flags must not determine DNSSEC or record resource counts."
+  }
+}
+
+run "unknown_managed_zone_id_and_dnssec_setting" {
+  command = plan
+  module {
+    source = "./tests/fixtures/unknown"
+  }
+  variables {
+    create_zone   = true
+    create_dnssec = true
+  }
+  assert {
+    condition     = output.dnssec != null && output.dnssec.status == "active" && output.record_name == "www.example.com"
+    error_message = "DNSSEC must be plannable with a new zone whose account and ID are unknown."
+  }
+}
+
 run "unknown_id_and_content_keep_stable_addresses" {
   command = plan
 

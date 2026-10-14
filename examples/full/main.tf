@@ -10,6 +10,14 @@ module "dns" {
     paused = false
   }
 
+  create_dnssec = true
+  dnssec = {
+    status              = "active"
+    dnssec_multi_signer = false
+    dnssec_presigned    = false
+    dnssec_use_nsec3    = false
+  }
+
   defaults = {
     ttl  = 1
     tags = ["managed-by:terraform"]

@@ -18,8 +18,8 @@
 A [Terraform module][module] to manage [Cloudflare][cloudflare] DNS with stable record keys,
 typed inputs, and access to every configurable DNS record property.
 
-This repository is the successor to `terraform-cloudflare-dns-record`. The v2 API manages individual records in one zone per module invocation, with optional ownership of the zone itself.
-DNSSEC and further DNS capabilities are planned as optional additions within this module's scope.
+This repository is the successor to `terraform-cloudflare-dns-record`. The v2 API manages individual records in one zone per module invocation, with optional ownership of the zone and its DNSSEC configuration.
+Further DNS capabilities are planned as optional additions within this module's scope.
 
 **Release status:** v2 is under development. The Registry source shown below is the intended v2 address; it must be published before Registry installation works.
 The historical `v1.0.0` tag retains the original single-record API. Existing users should read the [v2 migration guide](docs/UPGRADING.md).
@@ -151,6 +151,66 @@ plans to destroy the managed zone; it does not relinquish ownership safely. Dele
 its DNS configuration, including records outside this module. Keep managed-zone configuration in place
 until you have explicitly migrated its state ownership.
 
+## DNSSEC
+
+DNSSEC ownership is independent of zone ownership. Use it with a direct zone ID,
+a zone lookup, or `create_zone = true`:
+
+```hcl
+module "dns" {
+  source  = "terraform-cloudflare-modules/dns/cloudflare"
+  version = "~> 2.0"
+
+  zone_name     = "example.com"
+  create_dnssec = true
+
+  dnssec = {
+    status              = "active"
+    dnssec_multi_signer = false
+    dnssec_presigned    = false
+    dnssec_use_nsec3    = false
+  }
+}
+
+output "ds_record" {
+  value = module.dns.dnssec_ds
+}
+```
+
+`create_dnssec` defaults to false and must be known at plan time. It controls Terraform
+ownership; `dnssec.status` controls signing. Set status to `active` to enable DNSSEC,
+or `disabled` to request disabling it while retaining the managed resource.
+Status is trimmed and lowercased. Unset properties stay null and defer to the provider;
+`create_dnssec = true` alone does not explicitly request active signing. False flags remain false.
+DNSSEC properties require `create_dnssec = true` unless the whole module is disabled.
+
+The typed object exposes every optional [DNSSEC resource setting][dnssec_resource]:
+`status`, `dnssec_multi_signer`, `dnssec_presigned`, and `dnssec_use_nsec3`.
+The zone ID comes from the module's zone selection and may be unknown until apply.
+`dnssec` returns the complete resource, including its DS, digest, public key, and signing metadata;
+`dnssec_ds` returns the full DS record. Both outputs are null when DNSSEC is unmanaged or `create = false`.
+
+Publish the DS through the registrar or parent zone to complete the chain of trust.
+Putting a DS for this zone in its own `records` map does not establish that parent delegation.
+Cloudflare can report [pending states][dnssec_states] while delegation changes propagate;
+those are observed states, not accepted values for the desired `dnssec.status` input.
+
+Records wait for managed DNSSEC configuration, allowing external DNSKEY records after
+multi-signer mode is enabled. The toggle alone does not complete a [multi-signer setup][dnssec_multisigner]:
+coordinate keys, delegation, and external providers, and configure multi-provider DNS where required.
+Pre-signed mode similarly requires an appropriate [secondary DNS setup][dnssec_secondary].
+
+Import existing DNSSEC configuration before adopting it, following the
+[DNSSEC adoption guide](docs/UPGRADING.md#adopt-existing-dnssec).
+Changing `create_dnssec` to false, disabling the module, or removing it invokes DNSSEC deletion.
+Coordinate parent DS removal and propagation before deleting signing configuration.
+To stop managing DNSSEC while keeping it enabled, transfer or remove its state ownership without destroying it.
+
+[dnssec_resource]: https://developers.cloudflare.com/api/terraform/resources/dns/subresources/dnssec/
+[dnssec_states]: https://developers.cloudflare.com/dns/dnssec/dnssec-states/
+[dnssec_multisigner]: https://developers.cloudflare.com/dns/dnssec/multi-signer-dnssec/setup/
+[dnssec_secondary]: https://developers.cloudflare.com/dns/zone-setups/zone-transfers/cloudflare-as-secondary/dnssec-for-secondary/
+
 ## Records and defaults
 
 Map keys identify records or groups of records in Terraform. Keep them stable when names or content change; use a `moved` block when changing a key.
@@ -270,9 +330,11 @@ records = {
 | Name | Description | Type | Default | Required |
 | ---- | ----------- | ---- | ------- | :------: |
 | <a name="input_account_id"></a> [account\_id](#input\_account\_id) | Account ID required for a managed zone, or an optional account filter for a zone\_name lookup. For advanced lookups use zone\_filter.account instead. | `string` | `null` | no |
-| <a name="input_create"></a> [create](#input\_create) | Whether to manage DNS resources and perform zone lookups. Disabling an existing module plans destruction of its managed records and any managed zone. | `bool` | `true` | no |
+| <a name="input_create"></a> [create](#input\_create) | Whether to manage DNS resources and perform zone lookups. Disabling an existing module plans destruction of its managed records, DNSSEC configuration, and any managed zone. | `bool` | `true` | no |
+| <a name="input_create_dnssec"></a> [create\_dnssec](#input\_create\_dnssec) | Whether to manage DNSSEC for the selected zone, independently of zone ownership. Set dnssec.status to active to enable signing. Removing managed DNSSEC invokes provider deletion; coordinate parent DS removal first. | `bool` | `false` | no |
 | <a name="input_create_zone"></a> [create\_zone](#input\_create\_zone) | Whether to manage the zone itself. Requires zone\_name and account\_id; excludes zone\_id and zone\_filter. Import an existing zone before applying to adopt it. | `bool` | `false` | no |
 | <a name="input_defaults"></a> [defaults](#input\_defaults) | Record defaults. Non-null per-record values override these; empty comments, empty tags, and empty settings explicitly override defaults. Settings are replaced as a whole. | ```object({ comment = optional(string) include_shadow_metadata = optional(bool) private_routing = optional(bool) proxied = optional(bool, false) tags = optional(set(string)) ttl = optional(number, 1) settings = optional(object({ flatten_cname = optional(bool) ipv4_only = optional(bool) ipv6_only = optional(bool) })) })``` | `{}` | no |
+| <a name="input_dnssec"></a> [dnssec](#input\_dnssec) | DNSSEC properties, requiring create\_dnssec = true. Status accepts active or disabled and is trimmed/lowercased. Null properties defer to the provider; explicit false values are preserved. Registrar or parent-zone DS publication is managed separately. | ```object({ status = optional(string) dnssec_multi_signer = optional(bool) dnssec_presigned = optional(bool) dnssec_use_nsec3 = optional(bool) })``` | `{}` | no |
 | <a name="input_records"></a> [records](#input\_records) | DNS records keyed by stable identifiers. Set name explicitly, or omit it to use the key. Content accepts a scalar or a list; MX list entries support a priority followed by a hostname. Supply exactly one of content or data. Full typed fields are defined in modules/record-inputs/variables.tf. | `any` | `{}` | no |
 | <a name="input_zone"></a> [zone](#input\_zone) | Optional managed-zone properties. Only supported with create\_zone = true. Null values defer to the provider; an empty vanity\_name\_servers list explicitly clears custom nameservers. | ```object({ paused = optional(bool) type = optional(string) vanity_name_servers = optional(list(string)) })``` | `{}` | no |
 | <a name="input_zone_filter"></a> [zone\_filter](#input\_zone\_filter) | Complete cloudflare\_zone lookup filter. Must match exactly one zone. Mutually exclusive with zone\_id, zone\_name, and account\_id. Filter strings, including operators, are passed through unchanged. | ```object({ account = optional(object({ id = optional(string) name = optional(string) })) direction = optional(string) match = optional(string) name = optional(string) order = optional(string) status = optional(string) type = optional(list(string)) })``` | `null` | no |
@@ -283,6 +345,8 @@ records = {
 
 | Name | Description |
 | ---- | ----------- |
+| <a name="output_dnssec"></a> [dnssec](#output\_dnssec) | Complete managed DNSSEC resource, including status, signing settings, DS, digest, key metadata, and public key. Null when DNSSEC is unmanaged or the module is disabled. |
+| <a name="output_dnssec_ds"></a> [dnssec\_ds](#output\_dnssec\_ds) | Full DS record for publication through the registrar or parent zone. Null when DNSSEC is unmanaged or the module is disabled. Availability otherwise follows the provider. |
 | <a name="output_name_servers"></a> [name\_servers](#output\_name\_servers) | Cloudflare-assigned nameservers for the managed or looked-up zone. Null in direct zone\_id mode or when disabled. Registrar delegation is managed separately. |
 | <a name="output_records"></a> [records](#output\_records) | Complete DNS resources keyed by the input key for scalar/structured entries, or key[index] for list content. Includes IDs, names, content, proxied (enabled), proxiable (capable), metadata, and timestamps. Empty when disabled. |
 | <a name="output_zone"></a> [zone](#output\_zone) | Complete managed zone or zone lookup result, preserving its upstream schema and computed properties. Null in direct zone\_id mode or when disabled. |

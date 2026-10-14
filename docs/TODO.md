@@ -1,10 +1,9 @@
 # ✅ Terraform Cloudflare Modules - `TODO`s
 
-The product boundary is Cloudflare DNS. The v2 implementation manages records with optional ownership of their zone.
+The product boundary is Cloudflare DNS. The v2 implementation manages records with optional ownership of their zone and DNSSEC configuration.
 
 ## ➕ Additions
 
-- DNSSEC configuration and complete upstream outputs.
 - Zone DNS settings and further DNS-specific resources.
 
 Add each capability with complete configurable schema coverage and explicit ownership semantics.

@@ -44,8 +44,32 @@ data "cloudflare_zone" "this" {
   }
 }
 
+resource "cloudflare_zone_dnssec" "this" {
+  count = var.create && var.create_dnssec ? 1 : 0
+
+  zone_id             = local.zone_id
+  status              = var.dnssec.status == null ? null : lower(trimspace(var.dnssec.status))
+  dnssec_multi_signer = var.dnssec.dnssec_multi_signer
+  dnssec_presigned    = var.dnssec.dnssec_presigned
+  dnssec_use_nsec3    = var.dnssec.dnssec_use_nsec3
+
+  lifecycle {
+    precondition {
+      condition     = local.zone_selection_valid
+      error_message = "DNSSEC requires exactly one valid zone selector, or a managed zone."
+    }
+    precondition {
+      condition     = local.account_selection_valid
+      error_message = "Managed zones require account_id. Otherwise account_id is only supported with zone_name; use zone_filter.account for advanced lookups."
+    }
+  }
+}
+
 resource "cloudflare_dns_record" "this" {
   for_each = local.records
+
+  # External DNSKEY records require multi-signer DNSSEC to be configured first.
+  depends_on = [cloudflare_zone_dnssec.this]
 
   zone_id                 = local.zone_id
   name                    = each.value.name

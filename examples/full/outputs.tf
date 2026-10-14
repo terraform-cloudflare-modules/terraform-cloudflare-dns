@@ -12,3 +12,13 @@ output "name_servers" {
   description = "Cloudflare-assigned nameservers to configure at the registrar or parent zone."
   value       = module.dns.name_servers
 }
+
+output "dnssec" {
+  description = "Complete DNSSEC configuration and signing metadata."
+  value       = module.dns.dnssec
+}
+
+output "dnssec_ds" {
+  description = "DS record to publish through the registrar or parent zone after enabling DNSSEC."
+  value       = module.dns.dnssec_ds
+}

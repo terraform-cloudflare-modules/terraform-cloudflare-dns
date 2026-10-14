@@ -236,8 +236,8 @@ Registrar nameserver delegation and DNSSEC DS publication are separate operation
 The managed-zone resource exposes every configurable property in the reviewed
 Cloudflare schema: `account.id`, `name`, `type`, `paused`, and `vanity_name_servers`.
 All computed properties are retained in `zone`; `name_servers` is a convenience output.
-The checked-in Formr report currently predates this addition and must be regenerated
-and checked with the installed provider before committing the audited change.
+The checked-in Formr report currently predates zone management and must be regenerated
+and checked with the installed provider before publication.
 
 ## Convert scalar content to a list
 
@@ -265,3 +265,43 @@ scalar entries when each server needs an identity independent of its list positi
 The complete typed field schema is in `modules/record-inputs/variables.tf`; public
 validation still applies before normalization. Regenerate the Formr report after
 this input normalization change as well as the zone-management addition.
+
+## Adopt existing DNSSEC
+
+DNSSEC defaults to unmanaged, preserving existing consumers' record and zone addresses.
+Set `create_dnssec = true` and match the intended configuration in `dnssec`.
+Use `status = "active"` for signing or `status = "disabled"` to manage a disabled configuration.
+Review the current signing mode before choosing multi-signer, pre-signed, or NSEC3 settings.
+
+For DNSSEC not already owned by another resource, import using the zone ID:
+
+```hcl
+import {
+  to = module.dns.cloudflare_zone_dnssec.this[0]
+  id = "023e105f4ecef8ad9ca31a8372d0c353"
+}
+```
+
+If another resource in the same state already owns DNSSEC, move it instead:
+
+```hcl
+moved {
+  from = cloudflare_zone_dnssec.existing
+  to   = module.dns.cloudflare_zone_dnssec.this[0]
+}
+```
+
+Remove the previous declaration when moving ownership. Coordinate handoff when moving
+between separate states. Adoption should not replace DNSSEC, the zone, or existing records;
+review status and signing-flag changes carefully. Compare `dnssec_ds` with the published parent DS.
+The module manages Cloudflare's DNSSEC configuration; registrar and parent-zone changes are separate.
+
+Setting `create_dnssec = false` removes the resource and invokes provider deletion.
+Setting `dnssec.status = "disabled"` keeps the resource under management.
+Coordinate parent DS removal and allow it to propagate before deleting signing configuration,
+as described in [Cloudflare's DNSSEC states documentation](https://developers.cloudflare.com/dns/dnssec/dnssec-states/).
+To relinquish ownership while retaining remote DNSSEC, move or remove the resource from state
+without destroying it before removing the module's DNSSEC configuration.
+
+Regenerate and check the Formr report with the installed provider to include
+`cloudflare_zone_dnssec`, alongside the pending zone and record-input changes.

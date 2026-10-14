@@ -20,6 +20,16 @@ variable "multiple_values" {
   default     = false
 }
 
+variable "create_dnssec" {
+  description = "Exercise DNSSEC with an unknown zone ID and signing setting."
+  type        = bool
+  default     = false
+}
+
+resource "terraform_data" "multi_signer" {
+  input = false
+}
+
 resource "terraform_data" "zone" {
   input = "023e105f4ecef8ad9ca31a8372d0c353"
 }
@@ -34,6 +44,12 @@ module "dns" {
   zone_id     = var.create_zone ? null : terraform_data.zone.output
   zone_name   = var.create_zone ? "example.com" : null
   account_id  = var.create_zone ? terraform_data.zone.output : null
+
+  create_dnssec = var.create_dnssec
+  dnssec = var.create_dnssec ? {
+    status              = "active"
+    dnssec_multi_signer = terraform_data.multi_signer.output
+  } : {}
 
   records = merge({
     stable_key = {
@@ -72,4 +88,9 @@ output "record_keys" {
 output "zone" {
   description = "Zone lookup result, absent in direct-ID mode."
   value       = module.dns.zone
+}
+
+output "dnssec" {
+  description = "DNSSEC resource while its zone ID and signing setting are unknown."
+  value       = module.dns.dnssec
 }
