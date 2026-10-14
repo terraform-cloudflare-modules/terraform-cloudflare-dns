@@ -41,20 +41,26 @@ module "dns" {
 
   records = {
     www = {
+      name    = "www"
       type    = "A"
       content = "192.0.2.10"
       proxied = true
     }
-    mail_primary = {
-      name     = "@"
-      type     = "MX"
-      content  = "mail.example.net"
-      priority = 10
-      ttl      = 3600
+    mail = {
+      name = "@"
+      type = "MX"
+      content = [
+        "1 aspmx.l.google.com",
+        "5 alt1.aspmx.l.google.com",
+        "5 alt2.aspmx.l.google.com",
+        "10 alt3.aspmx.l.google.com",
+        "10 alt4.aspmx.l.google.com",
+      ]
+      ttl = 3600
     }
     certificate_authority = {
-      full_name = "example.com"
-      type      = "CAA"
+      name = "@"
+      type = "CAA"
       data = {
         flags = 0
         tag   = "issue"
@@ -118,7 +124,7 @@ module "dns" {
   }
 
   records = {
-    www = { type = "A", content = "192.0.2.10" }
+    www = { name = "www", type = "A", content = "192.0.2.10" }
   }
 }
 ```
@@ -147,15 +153,16 @@ until you have explicitly migrated its state ownership.
 
 ## Records and defaults
 
-Map keys are Terraform resource identities. Keep them stable when names or content change; use a `moved` block when changing a key.
-Different keys may share a DNS name and type. Each entry manages one Cloudflare record ID, rather than a Route53-style record set.
+Map keys identify records or groups of records in Terraform. Keep them stable when names or content change; use a `moved` block when changing a key.
+Different keys may share a DNS name and type. Scalar `content` and structured `data` create one resource; list `content` creates one resource per value.
 
 | Input | Convention |
 | --- | --- |
 | `name` | Relative DNS name. Defaults to the map key. Empty string or `@` selects the apex. |
 | `full_name` | Explicit DNS name; mutually exclusive with `name`. No zone suffix is added. |
 | `type` | Required. Whitespace is trimmed and the type is uppercased. Upstream validates supported types. |
-| `content` / `data` | Exactly one must be provided. Content strings are passed through unchanged. |
+| `content` / `data` | Exactly one must be provided. Content accepts a string or a list of strings; data accepts one structured object. |
+| `priority` | Shared priority for the entry. An inline MX list priority overrides it for that value. |
 | `ttl` | Defaults to 1 (automatic). Proxied records require 1; fixed TTLs must be integral, 30–86400. Values below 60 require Enterprise. |
 | `settings` | All upstream record settings: `flatten_cname`, `ipv4_only`, and `ipv6_only`. |
 | `tags` | A set of Cloudflare tag strings such as `owner:dns-team`. |
@@ -177,16 +184,71 @@ Module validation checks selection, naming, content/data exclusivity, TTLs and n
 `create = false` suppresses zones, lookups and records. Setting it to false plans to destroy all resources owned by this module, including a managed zone.
 Use it as a creation switch, not as a way to pause management.
 
+## Multiple content values
+
+The basic example groups several A addresses under one name; the full example groups Google Workspace MX values.
+Use your mail provider's actual required hosts and priorities; the examples illustrate the input format.
+
+For MX lists, use `"<priority> <hostname>"`. Spaces and tabs between those two fields are accepted,
+with surrounding whitespace ignored. Priorities must be integers from 0 to 65535.
+A bare hostname instead inherits the entry's `priority`; an inline priority takes precedence.
+Every value must have a priority by one of these two mechanisms. For example:
+
+```hcl
+records = {
+  mail = {
+    name     = "@"
+    type     = "MX"
+    priority = 20
+    content  = ["mx1.example.net", "10 mx2.example.net"]
+  }
+}
+```
+
+This creates two MX records with priorities 20 and 10. All values inherit the entry's TTL, proxy setting,
+comments, tags and other properties. Use separately keyed records when those properties need to differ per value.
+Only MX **list** values use priority parsing: scalar content and every non-MX payload remain unchanged,
+including TXT whitespace. Structured `data` remains a single object.
+
+Scalar entries retain their existing resource keys. List entries always use zero-based keys such as
+`mail[0]` and `mail[1]`, including one-element lists. Appending a value preserves existing identities;
+inserting, removing or reordering values changes which payload occupies each subsequent index.
+An empty list creates no records and removes any previously managed entries in that group.
+Generated keys must not collide with caller-supplied keys; the module rejects such collisions.
+
+Keys and list lengths must be known at plan time, but individual content values and MX priorities may be unknown.
+Changing an existing scalar to a list changes its resource address: follow the
+[state-move example](docs/UPGRADING.md#convert-scalar-content-to-a-list) to retain its record identity.
+
+The full record field types remain enforced after content normalization. Terraform has no string-or-list union
+inside a map of typed objects, so the public `records` input uses `any` with validation and delegates normalized
+objects to an internal [typed input module](modules/record-inputs/README.md). This module creates no resources.
+
 ## Outputs and compatibility
 
-`records` exposes the entire resource map: `module.dns.records["www"].id`, `.name`, `.proxied`, `.proxiable`, and other upstream fields.
-`proxied` means enabled; `proxiable` means capable. Metadata remains the upstream JSON string `meta`.
+`records` exposes the entire expanded resource map: `module.dns.records["www"].id`, `.name`, `.proxied`, `.proxiable`, and other upstream fields.
+`proxied` means enabled; `proxiable` means capable. Metadata remains the upstream JSON string `meta`. List entries are available as `module.dns.records["mail[0]"]`, `module.dns.records["mail[1]"]`, and so on.
 
 The implementation requires Terraform >= 1.8 and Cloudflare >= 5.28.0, < 6.0.0.
 The test matrix covers Terraform 1.8.5/1.16.6 and OpenTofu 1.13.1.
 Tests mock Cloudflare; live API behavior and the v1 state migration need separate verification before release.
 See [UPGRADING.md](docs/UPGRADING.md) for migration and Formr coverage checks,
 [SCHEMA.md](docs/SCHEMA.md) for report status, and [TODO.md](docs/TODO.md) for future DNS capabilities.
+
+## Optional name shorthand
+
+All examples above set `name` explicitly. As an optional shorthand, omitting both `name` and `full_name`
+uses the map key as the relative DNS name. This creates `www.example.com` in the `example.com` zone;
+entry order has no effect. For lists, the group key supplies the name, without the generated index suffix.
+
+```hcl
+records = {
+  www = {
+    type    = "A"
+    content = "192.0.2.10"
+  }
+}
+```
 
 ## Generated interface
 
@@ -199,7 +261,9 @@ See [UPGRADING.md](docs/UPGRADING.md) for migration and Formr coverage checks,
 
 ## Modules
 
-No modules.
+| Name | Source | Version |
+| ---- | ------ | ------- |
+| <a name="module_record_inputs"></a> [record\_inputs](#module\_record\_inputs) | ./modules/record-inputs | n/a |
 
 ## Inputs
 
@@ -209,7 +273,7 @@ No modules.
 | <a name="input_create"></a> [create](#input\_create) | Whether to manage DNS resources and perform zone lookups. Disabling an existing module plans destruction of its managed records and any managed zone. | `bool` | `true` | no |
 | <a name="input_create_zone"></a> [create\_zone](#input\_create\_zone) | Whether to manage the zone itself. Requires zone\_name and account\_id; excludes zone\_id and zone\_filter. Import an existing zone before applying to adopt it. | `bool` | `false` | no |
 | <a name="input_defaults"></a> [defaults](#input\_defaults) | Record defaults. Non-null per-record values override these; empty comments, empty tags, and empty settings explicitly override defaults. Settings are replaced as a whole. | ```object({ comment = optional(string) include_shadow_metadata = optional(bool) private_routing = optional(bool) proxied = optional(bool, false) tags = optional(set(string)) ttl = optional(number, 1) settings = optional(object({ flatten_cname = optional(bool) ipv4_only = optional(bool) ipv6_only = optional(bool) })) })``` | `{}` | no |
-| <a name="input_records"></a> [records](#input\_records) | DNS records keyed by stable caller-chosen identifiers. Use relative name (defaults to key), @ or empty name for apex, or full\_name for an FQDN. Supply exactly one of content or data. Numeric CAA/DNSKEY flags are accepted and normalized to numbers; NAPTR flags remain strings. | ```map(object({ name = optional(string) full_name = optional(string) type = string content = optional(string) comment = optional(string) include_shadow_metadata = optional(bool) priority = optional(number) private_routing = optional(bool) proxied = optional(bool) tags = optional(set(string)) ttl = optional(number) settings = optional(object({ flatten_cname = optional(bool) ipv4_only = optional(bool) ipv6_only = optional(bool) })) data = optional(object({ algorithm = optional(number) altitude = optional(number) certificate = optional(string) digest = optional(string) digest_type = optional(number) fingerprint = optional(string) flags = optional(string) key_tag = optional(number) lat_degrees = optional(number) lat_direction = optional(string) lat_minutes = optional(number) lat_seconds = optional(number) long_degrees = optional(number) long_direction = optional(string) long_minutes = optional(number) long_seconds = optional(number) matching_type = optional(number) order = optional(number) port = optional(number) precision_horz = optional(number) precision_vert = optional(number) preference = optional(number) priority = optional(number) protocol = optional(number) public_key = optional(string) regex = optional(string) replacement = optional(string) selector = optional(number) service = optional(string) size = optional(number) tag = optional(string) target = optional(string) type = optional(number) usage = optional(number) value = optional(string) weight = optional(number) })) }))``` | `{}` | no |
+| <a name="input_records"></a> [records](#input\_records) | DNS records keyed by stable identifiers. Set name explicitly, or omit it to use the key. Content accepts a scalar or a list; MX list entries support a priority followed by a hostname. Supply exactly one of content or data. Full typed fields are defined in modules/record-inputs/variables.tf. | `any` | `{}` | no |
 | <a name="input_zone"></a> [zone](#input\_zone) | Optional managed-zone properties. Only supported with create\_zone = true. Null values defer to the provider; an empty vanity\_name\_servers list explicitly clears custom nameservers. | ```object({ paused = optional(bool) type = optional(string) vanity_name_servers = optional(list(string)) })``` | `{}` | no |
 | <a name="input_zone_filter"></a> [zone\_filter](#input\_zone\_filter) | Complete cloudflare\_zone lookup filter. Must match exactly one zone. Mutually exclusive with zone\_id, zone\_name, and account\_id. Filter strings, including operators, are passed through unchanged. | ```object({ account = optional(object({ id = optional(string) name = optional(string) })) direction = optional(string) match = optional(string) name = optional(string) order = optional(string) status = optional(string) type = optional(list(string)) })``` | `null` | no |
 | <a name="input_zone_id"></a> [zone\_id](#input\_zone\_id) | Existing zone ID. Bypasses zone lookup; may be unknown until apply. Mutually exclusive with zone\_name, zone\_filter, and create\_zone. | `string` | `null` | no |
@@ -220,7 +284,7 @@ No modules.
 | Name | Description |
 | ---- | ----------- |
 | <a name="output_name_servers"></a> [name\_servers](#output\_name\_servers) | Cloudflare-assigned nameservers for the managed or looked-up zone. Null in direct zone\_id mode or when disabled. Registrar delegation is managed separately. |
-| <a name="output_records"></a> [records](#output\_records) | Complete DNS resources keyed by the input record keys. Includes IDs, names, content, proxied (enabled), proxiable (capable), metadata, and timestamps. Empty when disabled. |
+| <a name="output_records"></a> [records](#output\_records) | Complete DNS resources keyed by the input key for scalar/structured entries, or key[index] for list content. Includes IDs, names, content, proxied (enabled), proxiable (capable), metadata, and timestamps. Empty when disabled. |
 | <a name="output_zone"></a> [zone](#output\_zone) | Complete managed zone or zone lookup result, preserving its upstream schema and computed properties. Null in direct zone\_id mode or when disabled. |
 | <a name="output_zone_id"></a> [zone\_id](#output\_zone\_id) | Target zone ID, or null when disabled. |
 | <a name="output_zone_name"></a> [zone\_name](#output\_zone\_name) | Normalized name of the managed or looked-up zone. Null in direct zone\_id mode or when disabled. |

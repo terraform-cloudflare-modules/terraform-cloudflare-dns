@@ -238,3 +238,30 @@ Cloudflare schema: `account.id`, `name`, `type`, `paused`, and `vanity_name_serv
 All computed properties are retained in `zone`; `name_servers` is a convenience output.
 The checked-in Formr report currently predates this addition and must be regenerated
 and checked with the installed provider before committing the audited change.
+
+## Convert scalar content to a list
+
+Existing scalar and structured entries retain their resource addresses. List entries
+use `key[0]`, `key[1]`, etc. even when there is only one value. To convert an existing
+scalar entry named `mail` to a list, retain its content as the first list value and
+add a consumer-root move:
+
+```hcl
+moved {
+  from = module.dns.cloudflare_dns_record.this["mail"]
+  to   = module.dns.cloudflare_dns_record.this["mail[0]"]
+}
+```
+
+For MX values, include each value's priority prefix, or keep a shared `priority`
+with bare hostnames. Moving from several separately keyed entries to one list
+requires one move for each previous address to its chosen new index. Review the
+plan to confirm existing record IDs are retained and only additional values are
+created. Moving back to scalar content needs the reverse address move.
+
+List identity is positional: append to preserve existing addresses. Reordering or
+inserting values updates the existing indexed resources. Use individually keyed
+scalar entries when each server needs an identity independent of its list position.
+The complete typed field schema is in `modules/record-inputs/variables.tf`; public
+validation still applies before normalization. Regenerate the Formr report after
+this input normalization change as well as the zone-management addition.

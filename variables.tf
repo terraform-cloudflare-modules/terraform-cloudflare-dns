@@ -100,101 +100,82 @@ variable "defaults" {
 }
 
 variable "records" {
-  description = "DNS records keyed by stable caller-chosen identifiers. Use relative name (defaults to key), @ or empty name for apex, or full_name for an FQDN. Supply exactly one of content or data. Numeric CAA/DNSKEY flags are accepted and normalized to numbers; NAPTR flags remain strings."
-  type = map(object({
-    name                    = optional(string)
-    full_name               = optional(string)
-    type                    = string
-    content                 = optional(string)
-    comment                 = optional(string)
-    include_shadow_metadata = optional(bool)
-    priority                = optional(number)
-    private_routing         = optional(bool)
-    proxied                 = optional(bool)
-    tags                    = optional(set(string))
-    ttl                     = optional(number)
-    settings = optional(object({
-      flatten_cname = optional(bool)
-      ipv4_only     = optional(bool)
-      ipv6_only     = optional(bool)
-    }))
-    data = optional(object({
-      algorithm      = optional(number)
-      altitude       = optional(number)
-      certificate    = optional(string)
-      digest         = optional(string)
-      digest_type    = optional(number)
-      fingerprint    = optional(string)
-      flags          = optional(string)
-      key_tag        = optional(number)
-      lat_degrees    = optional(number)
-      lat_direction  = optional(string)
-      lat_minutes    = optional(number)
-      lat_seconds    = optional(number)
-      long_degrees   = optional(number)
-      long_direction = optional(string)
-      long_minutes   = optional(number)
-      long_seconds   = optional(number)
-      matching_type  = optional(number)
-      order          = optional(number)
-      port           = optional(number)
-      precision_horz = optional(number)
-      precision_vert = optional(number)
-      preference     = optional(number)
-      priority       = optional(number)
-      protocol       = optional(number)
-      public_key     = optional(string)
-      regex          = optional(string)
-      replacement    = optional(string)
-      selector       = optional(number)
-      service        = optional(string)
-      size           = optional(number)
-      tag            = optional(string)
-      target         = optional(string)
-      type           = optional(number)
-      usage          = optional(number)
-      value          = optional(string)
-      weight         = optional(number)
-    }))
-  }))
+  description = "DNS records keyed by stable identifiers. Set name explicitly, or omit it to use the key. Content accepts a scalar or a list; MX list entries support a priority followed by a hostname. Supply exactly one of content or data. Full typed fields are defined in modules/record-inputs/variables.tf."
+  # Terraform has no union type for mixed scalar/list content in a map of objects.
+  # Normalize content first, then apply the full object type in record-inputs.
+  type     = any
   default  = {}
   nullable = false
 
   validation {
-    condition     = alltrue([for record in var.records : (record.content != null) != (record.data != null)])
+    condition = can(keys(var.records)) && try(alltrue([
+      for record in var.records : can(keys(record)) && can(record.type)
+    ]), false)
+    error_message = "records must be an object of record objects, each with a type."
+  }
+
+  validation {
+    condition = try(alltrue([for record in var.records : try(record.content, null) == null ? true : (
+      can(tostring(record.content)) || try(alltrue([for value in tolist(record.content) : value != null && can(tostring(value))]), false)
+    )]), false)
+    error_message = "content must be a scalar string or a list of non-null strings. Structured payloads belong in data."
+  }
+
+  validation {
+    condition = try(alltrue([for record in var.records : upper(trimspace(record.type)) != "MX" ? true : try(alltrue([
+      for value in tolist(record.content) : can(regex("^([0-9]+)\\s+(\\S+)$", trimspace(value))) ? (
+        tonumber(regex("^([0-9]+)\\s+(\\S+)$", trimspace(value))[0]) <= 65535
+        ) : (
+        can(regex("^\\S+$", trimspace(value))) && try(tonumber(record.priority) >= 0 && tonumber(record.priority) <= 65535 && floor(tonumber(record.priority)) == tonumber(record.priority), false)
+      )
+    ]), true)]), false)
+    error_message = "Each MX list value must be '<priority> <hostname>', or a hostname with a record-level priority. Priorities must be integers from 0 to 65535."
+  }
+
+  validation {
+    condition = try(length(distinct(flatten([
+      for key, record in var.records : try([for index, value in tolist(record.content) : "${key}[${index}]"], [key])
+      ]))) == sum(concat([0], [
+      for record in var.records : try(length(tolist(record.content)), 1)
+    ])), false)
+    error_message = "Expanded content keys collide with another record key. Rename the conflicting key (list values use key[0], key[1], etc.)."
+  }
+
+  validation {
+    condition     = alltrue([for record in var.records : (try(record.content, null) != null) != (try(record.data, null) != null)])
     error_message = "Each record must set exactly one of content or data."
   }
 
   validation {
-    condition     = alltrue([for record in var.records : record.name == null || record.full_name == null])
+    condition     = alltrue([for record in var.records : try(record.name, null) == null || try(record.full_name, null) == null])
     error_message = "A record may set name or full_name, but not both."
   }
 
   validation {
-    condition = alltrue([for record in var.records : record.full_name == null ? true : (
-      length(trimsuffix(trimspace(record.full_name), ".")) > 0 && trimspace(record.full_name) != "@"
+    condition = alltrue([for record in var.records : try(record.full_name, null) == null ? true : (
+      length(trimsuffix(trimspace(try(record.full_name, null)), ".")) > 0 && trimspace(try(record.full_name, null)) != "@"
     )])
     error_message = "full_name must be a nonempty DNS name; use name = \"@\" for the zone apex."
   }
 
   validation {
     condition = alltrue([for key, record in var.records : (
-      length(trimspace(key)) > 0 && (record.type == null ? false : length(trimspace(record.type)) > 0)
+      length(trimspace(key)) > 0 && (try(record.type, null) == null ? false : length(trimspace(try(record.type, null))) > 0)
     )])
     error_message = "Record keys and types must be nonempty."
   }
 
   validation {
-    condition = alltrue([for record in var.records : record.ttl == null ? true : (
-      record.ttl == 1 || (record.ttl >= 30 && record.ttl <= 86400 && floor(record.ttl) == record.ttl)
+    condition = alltrue([for record in var.records : try(tonumber(record.ttl), null) == null ? true : (
+      try(tonumber(record.ttl), null) == 1 || (try(tonumber(record.ttl), null) >= 30 && try(tonumber(record.ttl), null) <= 86400 && floor(try(tonumber(record.ttl), null)) == try(tonumber(record.ttl), null))
     )])
     error_message = "Record ttl must be 1 (automatic) or an integer from 30 to 86400. Values below 60 require an Enterprise zone."
   }
 
   validation {
-    condition = alltrue([for record in var.records : record.data == null ? true : (
-      record.data.flags == null ? true : (
-        contains(["CAA", "DNSKEY"], upper(trimspace(record.type))) ? can(tonumber(record.data.flags)) : true
+    condition = alltrue([for record in var.records : try(record.data, null) == null ? true : (
+      try(record.data.flags, null) == null ? true : (
+        contains(["CAA", "DNSKEY"], upper(trimspace(try(record.type, null)))) ? can(tonumber(try(record.data.flags, null))) : true
       )
     )])
     error_message = "CAA and DNSKEY data.flags must be numeric. NAPTR flags may be text."

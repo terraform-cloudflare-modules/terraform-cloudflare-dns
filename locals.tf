@@ -25,11 +25,11 @@ locals {
 
 locals {
   relative_names = {
-    for key, record in var.records : key => lower(trimsuffix(trimspace(record.name != null ? record.name : key), "."))
+    for key, record in module.record_inputs.records : key => lower(trimsuffix(trimspace(record.name != null ? record.name : key), "."))
   }
 
-  records = {
-    for key, record in var.records : key => merge(record, {
+  normalized_records = {
+    for key, record in module.record_inputs.records : key => merge(record, {
       name = record.full_name != null ? lower(trimsuffix(trimspace(record.full_name), ".")) : (
         contains(["", "@"], local.relative_names[key]) ? (local.zone_name != null ? local.zone_name : "@") : (
           local.zone_name != null ? "${local.relative_names[key]}.${local.zone_name}" : local.relative_names[key]
@@ -53,6 +53,33 @@ locals {
           : jsonencode(record.data.flags)
         )
       })
+    }) if var.create
+  }
+}
+
+locals {
+  # Identities depend only on input keys and list lengths, never on record values.
+  content_indexes = {
+    for key, record in var.records : key => try([for index, value in tolist(record.content) : index], null)
+  }
+  record_instances = flatten([
+    for key, indexes in local.content_indexes : indexes == null ? [
+      { key = key, group = key, index = 0, multiple = false }
+    ] : [for index in indexes : { key = "${key}[${index}]", group = key, index = index, multiple = true }]
+  ])
+  mx_values = {
+    for instance in local.record_instances : instance.key => (
+      instance.multiple && local.normalized_records[instance.group].type == "MX" ?
+      try(regex("^([0-9]+)\\s+(\\S+)$", trimspace(local.normalized_records[instance.group].content[instance.index])), null) : null
+    ) if var.create
+  }
+  records = {
+    for instance in local.record_instances : instance.key => merge(local.normalized_records[instance.group], {
+      content = local.mx_values[instance.key] != null ? local.mx_values[instance.key][1] : try(
+        instance.multiple && local.normalized_records[instance.group].type == "MX" ?
+        trimspace(local.normalized_records[instance.group].content[instance.index]) : local.normalized_records[instance.group].content[instance.index], null
+      )
+      priority = local.mx_values[instance.key] != null ? tonumber(local.mx_values[instance.key][0]) : local.normalized_records[instance.group].priority
     }) if var.create
   }
 }

@@ -29,3 +29,21 @@ run "unknown_account_and_zone_id_keep_stable_addresses" {
     error_message = "Unknown account and generated zone IDs must not prevent planning record identities or fully qualified names."
   }
 }
+
+run "unknown_list_values_keep_stable_addresses" {
+  command = plan
+  module {
+    source = "./tests/fixtures/unknown"
+  }
+  variables {
+    multiple_values = true
+  }
+  assert {
+    condition = (
+      length(output.record_keys) == 5 && contains(output.record_keys, "stable_key") &&
+      contains(output.record_keys, "addresses[0]") && contains(output.record_keys, "addresses[1]") &&
+      contains(output.record_keys, "mail[0]") && contains(output.record_keys, "mail[1]")
+    )
+    error_message = "Known list lengths must allow planning even when record content and priorities are unknown."
+  }
+}

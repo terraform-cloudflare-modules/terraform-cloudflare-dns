@@ -17,6 +17,7 @@ module "dns" {
 
   records = {
     www = {
+      name    = "www"
       type    = "A"
       content = "192.0.2.10"
       proxied = true
@@ -27,12 +28,17 @@ module "dns" {
       content = "2001:db8::10"
       proxied = true
     }
-    mail_primary = {
-      name     = "@"
-      type     = "MX"
-      content  = "mail.example.net"
-      priority = 10
-      ttl      = 3600
+    mail = {
+      name = "@"
+      type = "MX"
+      content = [
+        "1 aspmx.l.google.com",
+        "5 alt1.aspmx.l.google.com",
+        "5 alt2.aspmx.l.google.com",
+        "10 alt3.aspmx.l.google.com",
+        "10 alt4.aspmx.l.google.com",
+      ]
+      ttl = 3600
     }
     verification = {
       name    = "_verification"

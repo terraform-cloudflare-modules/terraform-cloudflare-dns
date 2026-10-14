@@ -9,6 +9,9 @@
 
 ### Improvements
 
+- Support list-valued content with per-value MX priorities while retaining scalar addresses.
+- Use explicit DNS names in examples and document key-based naming separately.
+
 - Add opt-in zone creation/adoption, all zone resource inputs, and complete zone/nameserver outputs.
 
 - Add direct zone IDs, account-aware lookup, full zone filters, record defaults and DNS-name normalization.

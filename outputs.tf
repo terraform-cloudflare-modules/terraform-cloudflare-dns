@@ -32,6 +32,6 @@ output "name_servers" {
 }
 
 output "records" {
-  description = "Complete DNS resources keyed by the input record keys. Includes IDs, names, content, proxied (enabled), proxiable (capable), metadata, and timestamps. Empty when disabled."
+  description = "Complete DNS resources keyed by the input key for scalar/structured entries, or key[index] for list content. Includes IDs, names, content, proxied (enabled), proxiable (capable), metadata, and timestamps. Empty when disabled."
   value       = cloudflare_dns_record.this
 }
