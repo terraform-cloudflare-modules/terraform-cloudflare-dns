@@ -1,3 +1,20 @@
+## [2.1.0](https://github.com/terraform-cloudflare-modules/terraform-cloudflare-dns/compare/v2.0.0...v2.1.0) (2026-10-15)
+
+### Features
+
+* add account DNS settings submodule ([ffb8777](https://github.com/terraform-cloudflare-modules/terraform-cloudflare-dns/commit/ffb8777c82e0284b31c1123f3b85d56560d0c31e))
+* add DNS Firewall submodule ([28c3eb9](https://github.com/terraform-cloudflare-modules/terraform-cloudflare-dns/commit/28c3eb9e68c034d937109fdc405c03cedadcdebb))
+* add internal DNS views submodule ([16631e2](https://github.com/terraform-cloudflare-modules/terraform-cloudflare-dns/commit/16631e2533f0a9237bcc51b2a680b8f39aea46ea))
+* add load balancing and geographic steering ([9871f22](https://github.com/terraform-cloudflare-modules/terraform-cloudflare-dns/commit/9871f2249b81d459abd389c0e8f53af04803cff2))
+* add load balancing monitor groups submodule ([1f3bc95](https://github.com/terraform-cloudflare-modules/terraform-cloudflare-dns/commit/1f3bc9580726b5bec961582c10935b74ac8397ac))
+* add optional DNSSEC management ([9fa73d2](https://github.com/terraform-cloudflare-modules/terraform-cloudflare-dns/commit/9fa73d2984bcab7e668476fd17b8ad6e28ea81d9))
+* add optional zone DNS settings management ([692353d](https://github.com/terraform-cloudflare-modules/terraform-cloudflare-dns/commit/692353daf20dc57f6764e1bdfb1485fbe415e8ec))
+* add reusable DNS zone transfer management ([1aaa44e](https://github.com/terraform-cloudflare-modules/terraform-cloudflare-dns/commit/1aaa44eb88b2be7931165ee4aded09d7c75820e2))
+
+### Bug Fixes
+
+* use valid provider inputs in DNS tests and examples ([6f1813f](https://github.com/terraform-cloudflare-modules/terraform-cloudflare-dns/commit/6f1813f7b00c3698108d96c4aa5f3c9018df50bc))
+
 ## [2.0.0](https://github.com/terraform-cloudflare-modules/terraform-cloudflare-dns/compare/v1.0.0...v2.0.0) (2026-10-14)
 
 ### ⚠ BREAKING CHANGES
