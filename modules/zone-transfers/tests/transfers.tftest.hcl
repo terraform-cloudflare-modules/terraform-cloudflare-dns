@@ -97,15 +97,16 @@ run "per_entry_accounts_and_literal_peer_ids" {
     acls       = { ipv6 = { account_id = "acl-account", ip_range = "2001:db8::/64" } }
     tsig_keys  = { shared = { account_id = "key-account", algo = "hmac-sha512", secret = base64encode("test-only-secondary-secret") } }
     peers      = { literal = { account_id = "peer-account", tsig_id = "existing-id", ixfr_enable = false, port = 0 } }
-    incoming   = { existing = { zone_id = "zone-id", name = "example.com", peers = ["existing-peer"], auto_refresh_seconds = 0 } }
-    outgoing   = { cleared = { zone_id = "other-zone-id", name = "example.net", peers = [] } }
+    # Exercise the provider's minimum refresh interval with an existing peer.
+    incoming = { existing = { zone_id = "zone-id", name = "example.com", peers = ["existing-peer"], auto_refresh_seconds = 300 } }
+    outgoing = { cleared = { zone_id = "other-zone-id", name = "example.net", peers = [] } }
   }
   assert {
     condition = (
       output.acls.ipv6.account_id == "acl-account" && output.acls.ipv6.name == "ipv6" &&
       output.tsig_keys.shared.account_id == "key-account" && output.tsig_keys.shared.name == "shared" &&
       output.peers.literal.account_id == "peer-account" && output.peers.literal.tsig_id == "existing-id" &&
-      !output.peers.literal.ixfr_enable && output.peers.literal.port == 0 && output.incoming.existing.auto_refresh_seconds == 0 &&
+      !output.peers.literal.ixfr_enable && output.peers.literal.port == 0 && output.incoming.existing.auto_refresh_seconds == 300 &&
       contains(output.incoming.existing.peers, "existing-peer") && length(output.outgoing.cleared.peers) == 0
     )
     error_message = "Account overrides, literal IDs, zero values, and explicit empty peer sets must pass through for upstream validation."
