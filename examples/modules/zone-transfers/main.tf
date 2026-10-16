@@ -19,18 +19,22 @@ module "secondary_zone" {
 module "transfers" {
   source = "../../../modules/zone-transfers"
 
+  create = true
+
   account_id = var.account_id
 
   tsig_keys = {
     signing = {
-      name   = "transfer-key.${var.primary_zone_name}."
-      algo   = "hmac-sha256"
-      secret = var.transfer_secret
+      account_id = var.account_id # Overrides the module default.
+      name       = "transfer-key.${var.primary_zone_name}."
+      algo       = "hmac-sha256"
+      secret     = var.transfer_secret
     }
   }
 
   peers = {
     primary = {
+      account_id  = var.account_id # Overrides the module default.
       name        = "External primary"
       ip          = "192.0.2.1"
       port        = 53
@@ -47,7 +51,7 @@ module "transfers" {
 
   # Additional NOTIFY addresses, when the provider uses a separate sender.
   acls = {
-    notify = { name = "External NOTIFY sender", ip_range = "192.0.2.3/32" }
+    notify = { account_id = var.account_id, name = "External NOTIFY sender", ip_range = "192.0.2.3/32" }
   }
 
   incoming = {

@@ -4,22 +4,36 @@ Manage `cloudflare_account_dns_settings_internal_view` resources independently
 of internal zones. Each `views` entry opts into owning one view. An empty map or
 `create = false` creates no resources.
 
+## Usage
+
 ```hcl
+variable "account_id" {
+  description = "Account containing internal zones."
+  type        = string
+}
+
+variable "internal_zone_ids" {
+  description = "Existing internal zones to include in the view."
+  type        = set(string)
+}
+
 module "internal_views" {
   source = "terraform-cloudflare-modules/dns/cloudflare//modules/internal-views"
 
   account_id = var.account_id
   views = {
     corporate = {
-      name = "Corporate clients"
-      zones = [
-        module.internal_apps.zone_id,
-        module.internal_services.zone_id,
-      ]
+      name  = "Corporate clients"
+      zones = var.internal_zone_ids
     }
   }
 }
 ```
+
+## Examples
+
+See the [full example](../../examples/modules/internal-views) for all inputs,
+composition with related resources, and prerequisites.
 
 ## Zone membership
 
@@ -54,10 +68,6 @@ membership changes.
 
 ## Adoption and verification
 
-These submodules were added after v2.0.0. Use a local checkout containing them until
-a release includes them, then pin that release when using the Registry source.
-Provider configuration and credentials belong to the caller.
-
 When an existing resource is already managed in the same state, retain its ID with
 a caller-root move and remove the old declaration:
 
@@ -90,27 +100,51 @@ API behavior or account entitlements. Exercise creation, updates, a second
 no-change plan, and removal in a dedicated test account before production use.
 
 <!-- BEGIN_TF_DOCS -->
+## Requirements
+
+| Name | Version |
+| ---- | ------- |
+| terraform | >= 1.8 |
+| cloudflare | >= 5.28.0, < 6.0.0 |
+
 ## Providers
 
 | Name | Version |
 | ---- | ------- |
-| <a name="provider_cloudflare"></a> [cloudflare](#provider\_cloudflare) | >= 5.28.0, < 6.0.0 |
+| cloudflare | >= 5.28.0, < 6.0.0 |
 
-## Modules
+## Resources
 
-No modules.
+| Name | Type |
+| ---- | ---- |
+| [cloudflare_account_dns_settings_internal_view.this](https://registry.terraform.io/providers/cloudflare/cloudflare/latest/docs/resources/account_dns_settings_internal_view) | resource |
 
 ## Inputs
 
 | Name | Description | Type | Default | Required |
 | ---- | ----------- | ---- | ------- | :------: |
-| <a name="input_account_id"></a> [account\_id](#input\_account\_id) | Default account for managed entries. Individual entries can override it. | `string` | `null` | no |
-| <a name="input_create"></a> [create](#input\_create) | Whether to manage resources in this submodule. Must be known at plan time. | `bool` | `true` | no |
-| <a name="input_views"></a> [views](#input\_views) | Internal DNS views keyed by stable identifiers. Names default to keys; explicit names are preserved. zones is the complete set of internal zone IDs to associate with each view and may be empty. Individual account IDs override the module default. | ```map(object({ account_id = optional(string) name = optional(string) zones = set(string) }))``` | `{}` | no |
+| account\_id | Default account for managed entries. Individual entries can override it. | `string` | `null` | no |
+| create | Whether to manage resources in this submodule. Must be known at plan time. | `bool` | `true` | no |
+| views | Internal DNS views keyed by stable identifiers. Names default to keys; explicit names are preserved. zones is the complete set of internal zone IDs to associate with each view and may be empty. Individual account IDs override the module default. | ```map(object({ account_id = optional(string) name = optional(string) zones = set(string) }))``` | `{}` | no |
 
 ## Outputs
 
 | Name | Description |
 | ---- | ----------- |
-| <a name="output_views"></a> [views](#output\_views) | Complete managed views keyed by input keys, including computed properties. Empty when disabled or unconfigured. |
+| views | Complete managed views keyed by input keys, including computed properties. Empty when disabled or unconfigured. |
 <!-- END_TF_DOCS -->
+
+## Contributing
+
+See [CONTRIBUTING.md](../../docs/CONTRIBUTING.md) for contribution guidelines and
+[UPGRADING.md](../../docs/UPGRADING.md) for adoption and migration guidance.
+The generated [schema report](docs/SCHEMA.md) documents provider coverage.
+
+## Authors
+
+Maintained by [Terraform Cloudflare Modules](https://github.com/terraform-cloudflare-modules).
+See [AUTHORS](../../.github/AUTHORS) and [CODEOWNERS](../../.github/CODEOWNERS).
+
+## License
+
+MIT. See [LICENSE](../../LICENSE).

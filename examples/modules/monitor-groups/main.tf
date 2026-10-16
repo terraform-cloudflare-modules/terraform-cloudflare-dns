@@ -10,9 +10,12 @@ resource "cloudflare_load_balancer_monitor" "api" {
 module "monitor_groups" {
   source = "../../../modules/monitor-groups"
 
+  create = true
+
   account_id = var.account_id
   groups = {
     service = {
+      account_id  = var.account_id # Overrides the module default.
       description = "Shared API health checks"
       members = [{
         monitor_id      = cloudflare_load_balancer_monitor.api.id

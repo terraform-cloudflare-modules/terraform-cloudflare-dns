@@ -1,83 +1,53 @@
-<p align="center">
-    <!-- terraform-cloudflare-dns -->
-<img src="https://cdn.simpleicons.org/terraform/844FBA" alt="Terraform Logo" align="center" width="128">
-<img src="https://cdn.simpleicons.org/cloudflare/F38020" alt="Cloudflare Logo" align="center" width="128">
-    <h1 align="center">Cloudflare</h1>
-    <h2 align="center"><code>dns</code></h2>
-</p>
+# Cloudflare DNS Terraform module
 
-[![License](https://img.shields.io/github/license/terraform-cloudflare-modules/terraform-cloudflare-dns?label=License)](https://opensource.org/licenses/MIT)
-[![Terraform](https://img.shields.io/badge/Terraform-_>=_1.8-brightgreen?logo=terraform&logoColor=623CE4)][terraform]
-[![OpenTofu](https://img.shields.io/badge/OpenTofu-_>=_1.13.1-brightgreen?logo=opentofu)][opentofu]
-[![CI Status](https://github.com/terraform-cloudflare-modules/terraform-cloudflare-dns/actions/workflows/testing.yaml/badge.svg)](https://github.com/terraform-cloudflare-modules/terraform-cloudflare-dns/blob/main/.github/workflows/testing.yaml)
-[![GitHub Release](https://img.shields.io/github/v/release/terraform-cloudflare-modules/terraform-cloudflare-dns?label=Release)][github_releases]
-[![GitHub Activity](https://img.shields.io/github/commit-activity/m/terraform-cloudflare-modules/terraform-cloudflare-dns?label=Commits)][github_commits]
-[![Renovate](https://img.shields.io/badge/Renovate-enabled-brightgreen?logo=renovate&logoColor=1A1F6C)][renovate]
-[![Pre-Commit](https://img.shields.io/badge/PreCommit-enabled-brightgreen?logo=precommit&logoColor=FAB040)][pre-commit]
+Manage records in one zone, with optional zone creation, DNSSEC, DNS settings, and
+load balancing. Standalone submodules manage shared account settings, DNS Firewall,
+monitor groups, internal views, and zone transfers.
 
-A [Terraform module][module] to manage [Cloudflare][cloudflare] DNS with stable record keys,
-typed inputs, and access to every configurable DNS record property.
+This replaces `terraform-cloudflare-dns-record`. Existing users should follow the
+[v2 migration guide](docs/UPGRADING.md) before changing their module source.
 
-This repository is the successor to `terraform-cloudflare-dns-record`. The v2 API manages individual records in one zone per module invocation,
-with optional zone, DNSSEC, zone-wide DNS settings, and load balancing management.
-Account-wide and shared DNS features are available through standalone submodules.
+## Usage
 
-**Release status:** v2.0.0 has been released. This branch includes newer, unreleased DNSSEC, DNS settings, load balancing, and standalone DNS submodules.
-Examples using these additions require a checkout containing them until a release includes them. Registry publication is separate from a GitHub release.
-The historical `v1.0.0` tag retains the original single-record API. Existing users should read the [v2 migration guide](docs/UPGRADING.md).
-
-## ✨ TL;DR
+Copy this configuration into `main.tf` and supply the ID of an existing zone.
 
 ```hcl
+variable "zone_id" {
+  description = "Cloudflare zone to manage records in."
+  type        = string
+}
+
 module "dns" {
   source  = "terraform-cloudflare-modules/dns/cloudflare"
-  version = "~> 2.0"
+  version = "~> 2.1"
 
-  zone_name  = "example.com"
-  account_id = var.cloudflare_account_id
-
-  defaults = {
-    ttl     = 1
-    proxied = false
-  }
-
+  zone_id = var.zone_id
   records = {
-    www = {
+    web = {
       name    = "www"
       type    = "A"
-      content = "192.0.2.10"
-      proxied = true
+      content = ["192.0.2.10", "192.0.2.11"]
     }
     mail = {
-      name = "@"
-      type = "MX"
-      content = [
-        "1 aspmx.l.google.com",
-        "5 alt1.aspmx.l.google.com",
-        "5 alt2.aspmx.l.google.com",
-        "10 alt3.aspmx.l.google.com",
-        "10 alt4.aspmx.l.google.com",
-      ]
-      ttl = 3600
-    }
-    certificate_authority = {
-      name = "@"
-      type = "CAA"
-      data = {
-        flags = 0
-        tag   = "issue"
-        value = "letsencrypt.org"
-      }
+      name    = "@"
+      type    = "MX"
+      content = ["10 mx1.example.net", "20 mx2.example.net"]
+      ttl     = 3600
     }
   }
 }
 ```
 
-Configure the Cloudflare provider in the calling root module. The examples use `CLOUDFLARE_API_TOKEN` through the provider's normal environment authentication.
-Keep provider credentials out of module inputs.
+Replace the documentation addresses and mail hosts with your own endpoints.
+Map keys provide stable Terraform identities; `name` selects the DNS name.
 
-See [basic](examples/basic) and [full](examples/full) examples.
-Run examples from this checkout before publication.
+## Examples
+
+- [Basic](examples/basic): records in an existing zone.
+- [Full](examples/full): every root input and nested field, with mutually exclusive
+  alternatives and feature prerequisites documented alongside the configuration.
+- [Submodules](examples/modules): account settings, monitor groups, DNS Firewall,
+  internal views, and transfers, each with a dedicated complete example.
 
 ## Zone selection
 
@@ -113,6 +83,11 @@ The `zone` and `zone_name` outputs are null in direct-ID mode. Use `full_name` i
 Set `create_zone = true` to create a zone or manage one imported into this module:
 
 ```hcl
+variable "cloudflare_account_id" {
+  description = "Account containing the managed zone."
+  type        = string
+}
+
 module "dns" {
   source  = "terraform-cloudflare-modules/dns/cloudflare"
   version = "~> 2.0"
@@ -277,7 +252,7 @@ Load balancing requires the corresponding Cloudflare subscription; geographic an
 other advanced features depend on your account's entitlements.
 
 ```hcl
-account_id = var.cloudflare_account_id
+account_id = "replace-with-your-account-id"
 
 load_balancer_monitors = {
   https = {
@@ -493,97 +468,81 @@ records = {
 }
 ```
 
-## Generated interface
-
 <!-- BEGIN_TF_DOCS -->
+## Requirements
+
+| Name | Version |
+| ---- | ------- |
+| terraform | >= 1.8 |
+| cloudflare | >= 5.28.0, < 6.0.0 |
+
 ## Providers
 
 | Name | Version |
 | ---- | ------- |
-| <a name="provider_cloudflare"></a> [cloudflare](#provider\_cloudflare) | >= 5.28.0, < 6.0.0 |
+| cloudflare | >= 5.28.0, < 6.0.0 |
 
-## Modules
+## Resources
 
-| Name | Source | Version |
-| ---- | ------ | ------- |
-| <a name="module_record_inputs"></a> [record\_inputs](#module\_record\_inputs) | ./modules/record-inputs | n/a |
+| Name | Type |
+| ---- | ---- |
+| [cloudflare_dns_record.this](https://registry.terraform.io/providers/cloudflare/cloudflare/latest/docs/resources/dns_record) | resource |
+| [cloudflare_load_balancer.this](https://registry.terraform.io/providers/cloudflare/cloudflare/latest/docs/resources/load_balancer) | resource |
+| [cloudflare_load_balancer_monitor.this](https://registry.terraform.io/providers/cloudflare/cloudflare/latest/docs/resources/load_balancer_monitor) | resource |
+| [cloudflare_load_balancer_pool.this](https://registry.terraform.io/providers/cloudflare/cloudflare/latest/docs/resources/load_balancer_pool) | resource |
+| [cloudflare_zone.this](https://registry.terraform.io/providers/cloudflare/cloudflare/latest/docs/resources/zone) | resource |
+| [cloudflare_zone_dns_settings.this](https://registry.terraform.io/providers/cloudflare/cloudflare/latest/docs/resources/zone_dns_settings) | resource |
+| [cloudflare_zone_dnssec.this](https://registry.terraform.io/providers/cloudflare/cloudflare/latest/docs/resources/zone_dnssec) | resource |
 
 ## Inputs
 
 | Name | Description | Type | Default | Required |
 | ---- | ----------- | ---- | ------- | :------: |
-| <a name="input_account_id"></a> [account\_id](#input\_account\_id) | Account ID required for a managed zone, an optional account filter for a zone\_name lookup, and the default account for load balancing pools/monitors. For advanced lookups use zone\_filter.account instead. | `string` | `null` | no |
-| <a name="input_create"></a> [create](#input\_create) | Whether to manage DNS resources and perform zone lookups. Disabling an existing module plans destruction of its managed records, DNSSEC configuration, and any managed zone. | `bool` | `true` | no |
-| <a name="input_create_dns_settings"></a> [create\_dns\_settings](#input\_create\_dns\_settings) | Whether to manage zone-wide DNS settings, independently of zone and DNSSEC ownership. Settings affect all records in the zone, including records outside this module. | `bool` | `false` | no |
-| <a name="input_create_dnssec"></a> [create\_dnssec](#input\_create\_dnssec) | Whether to manage DNSSEC for the selected zone, independently of zone ownership. Set dnssec.status to active to enable signing. Removing managed DNSSEC invokes provider deletion; coordinate parent DS removal first. | `bool` | `false` | no |
-| <a name="input_create_zone"></a> [create\_zone](#input\_create\_zone) | Whether to manage the zone itself. Requires zone\_name and account\_id; excludes zone\_id and zone\_filter. Import an existing zone before applying to adopt it. | `bool` | `false` | no |
-| <a name="input_defaults"></a> [defaults](#input\_defaults) | Record defaults. Non-null per-record values override these; empty comments, empty tags, and empty settings explicitly override defaults. Settings are replaced as a whole. | ```object({ comment = optional(string) include_shadow_metadata = optional(bool) private_routing = optional(bool) proxied = optional(bool, false) tags = optional(set(string)) ttl = optional(number, 1) settings = optional(object({ flatten_cname = optional(bool) ipv4_only = optional(bool) ipv6_only = optional(bool) })) })``` | `{}` | no |
-| <a name="input_dns_settings"></a> [dns\_settings](#input\_dns\_settings) | Zone-wide DNS settings, requiring create\_dns\_settings = true. Null properties defer to the provider; false, zero, and empty nested objects are passed through. Zone mode and nameserver type are trimmed/lowercased. foundation\_dns is deprecated upstream; prefer nameservers.type. | ```object({ flatten_all_cnames = optional(bool) foundation_dns = optional(bool) multi_provider = optional(bool) ns_ttl = optional(number) secondary_overrides = optional(bool) zone_mode = optional(string) internal_dns = optional(object({ reference_zone_id = optional(string) })) nameservers = optional(object({ type = string ns_set = optional(number) nameserver_set_id = optional(string) })) soa = optional(object({ expire = optional(number) min_ttl = optional(number) mname = optional(string) refresh = optional(number) retry = optional(number) rname = optional(string) ttl = optional(number) })) })``` | `{}` | no |
-| <a name="input_dnssec"></a> [dnssec](#input\_dnssec) | DNSSEC properties, requiring create\_dnssec = true. Status accepts active or disabled and is trimmed/lowercased. Null properties defer to the provider; explicit false values are preserved. Registrar or parent-zone DS publication is managed separately. | ```object({ status = optional(string) dnssec_multi_signer = optional(bool) dnssec_presigned = optional(bool) dnssec_use_nsec3 = optional(bool) })``` | `{}` | no |
-| <a name="input_load_balancer_monitors"></a> [load\_balancer\_monitors](#input\_load\_balancer\_monitors) | Account-level health monitors keyed by stable identifiers. account\_id defaults to the module account\_id. Monitor type and HTTP method are normalized; bodies, paths, headers, and other settings pass through unchanged. | ```map(object({ account_id = optional(string) allow_insecure = optional(bool) consecutive_down = optional(number) consecutive_up = optional(number) description = optional(string) expected_body = optional(string) expected_codes = optional(string) follow_redirects = optional(bool) header = optional(map(list(string))) interval = optional(number) method = optional(string) path = optional(string) port = optional(number) probe_zone = optional(string) retries = optional(number) timeout = optional(number) type = optional(string) }))``` | `{}` | no |
-| <a name="input_load_balancer_pools"></a> [load\_balancer\_pools](#input\_load\_balancer\_pools) | Account-level pools keyed by stable identifiers. Name defaults to the key; account\_id defaults to the module account\_id. Monitor accepts a managed monitor key or an existing ID. All configurable upstream properties are available. | ```map(object({ account_id = optional(string) check_regions = optional(list(string)) description = optional(string) enabled = optional(bool) health_sources = optional(list(string)) latitude = optional(number) load_shedding = optional(object({ default_percent = optional(number) default_policy = optional(string) session_percent = optional(number) session_policy = optional(string) })) longitude = optional(number) minimum_origins = optional(number) monitor = optional(string) monitor_group = optional(string) name = optional(string) notification_email = optional(string) notification_filter = optional(object({ origin = optional(object({ disable = optional(bool) healthy = optional(bool) })) pool = optional(object({ disable = optional(bool) healthy = optional(bool) })) })) origin_steering = optional(object({ policy = optional(string) })) origins = list(object({ address = optional(string) enabled = optional(bool) flatten_cname = optional(bool) header = optional(object({ host = optional(list(string)) })) name = optional(string) port = optional(number) virtual_network_id = optional(string) weight = optional(number) })) }))``` | `{}` | no |
-| <a name="input_load_balancers"></a> [load\_balancers](#input\_load\_balancers) | Load balancers keyed by stable identifiers. Names follow record name/full\_name rules. Pool references accept managed pool keys or existing IDs, including rule overrides and weight-map keys. Defaults to DNS-only (proxied = false); all upstream settings remain configurable. | ```map(object({ adaptive_routing = optional(object({ failover_across_pools = optional(bool) })) country_pools = optional(map(list(string))) default_pools = list(string) description = optional(string) enabled = optional(bool) fallback_pool = string location_strategy = optional(object({ mode = optional(string) prefer_ecs = optional(string) })) name = optional(string) networks = optional(list(string)) pop_pools = optional(map(list(string))) proxied = optional(bool, false) random_steering = optional(object({ default_weight = optional(number) pool_weights = optional(map(number)) })) region_pools = optional(map(list(string))) rules = optional(list(object({ condition = optional(string) disabled = optional(bool) fixed_response = optional(object({ content_type = optional(string) location = optional(string) message_body = optional(string) status_code = optional(number) })) name = optional(string) overrides = optional(object({ adaptive_routing = optional(object({ failover_across_pools = optional(bool) })) country_pools = optional(map(list(string))) default_pools = optional(list(string)) fallback_pool = optional(string) location_strategy = optional(object({ mode = optional(string) prefer_ecs = optional(string) })) pop_pools = optional(map(list(string))) random_steering = optional(object({ default_weight = optional(number) pool_weights = optional(map(number)) })) region_pools = optional(map(list(string))) session_affinity = optional(string) session_affinity_attributes = optional(object({ drain_duration = optional(number) headers = optional(list(string)) require_all_headers = optional(bool) samesite = optional(string) secure = optional(string) zero_downtime_failover = optional(string) })) session_affinity_ttl = optional(number) steering_policy = optional(string) ttl = optional(number) })) priority = optional(number) terminates = optional(bool) }))) session_affinity = optional(string) session_affinity_attributes = optional(object({ drain_duration = optional(number) headers = optional(list(string)) require_all_headers = optional(bool) samesite = optional(string) secure = optional(string) zero_downtime_failover = optional(string) })) session_affinity_ttl = optional(number) steering_policy = optional(string) ttl = optional(number) full_name = optional(string) }))``` | `{}` | no |
-| <a name="input_records"></a> [records](#input\_records) | DNS records keyed by stable identifiers. Set name explicitly, or omit it to use the key. Content accepts a scalar or a list; MX list entries support a priority followed by a hostname. Supply exactly one of content or data. Full typed fields are defined in modules/record-inputs/variables.tf. | `any` | `{}` | no |
-| <a name="input_zone"></a> [zone](#input\_zone) | Optional managed-zone properties. Only supported with create\_zone = true. Null values defer to the provider; an empty vanity\_name\_servers list explicitly clears custom nameservers. | ```object({ paused = optional(bool) type = optional(string) vanity_name_servers = optional(list(string)) })``` | `{}` | no |
-| <a name="input_zone_filter"></a> [zone\_filter](#input\_zone\_filter) | Complete cloudflare\_zone lookup filter. Must match exactly one zone. Mutually exclusive with zone\_id and zone\_name. Use filter.account for lookup filtering; account\_id can separately supply load balancing pools/monitors. Filter strings pass through unchanged. | ```object({ account = optional(object({ id = optional(string) name = optional(string) })) direction = optional(string) match = optional(string) name = optional(string) order = optional(string) status = optional(string) type = optional(list(string)) })``` | `null` | no |
-| <a name="input_zone_id"></a> [zone\_id](#input\_zone\_id) | Existing zone ID. Bypasses zone lookup; may be unknown until apply. Mutually exclusive with zone\_name, zone\_filter, and create\_zone. | `string` | `null` | no |
-| <a name="input_zone_name"></a> [zone\_name](#input\_zone\_name) | Zone name to create/manage when create\_zone is true, or look up otherwise. Mutually exclusive with zone\_id and zone\_filter. Use Punycode for internationalized names. | `string` | `null` | no |
+| account\_id | Account ID required for a managed zone, an optional account filter for a zone\_name lookup, and the default account for load balancing pools/monitors. For advanced lookups use zone\_filter.account instead. | `string` | `null` | no |
+| create | Whether to manage DNS resources and perform zone lookups. Disabling an existing module plans destruction of its managed records, DNSSEC configuration, and any managed zone. | `bool` | `true` | no |
+| create\_dns\_settings | Whether to manage zone-wide DNS settings, independently of zone and DNSSEC ownership. Settings affect all records in the zone, including records outside this module. | `bool` | `false` | no |
+| create\_dnssec | Whether to manage DNSSEC for the selected zone, independently of zone ownership. Set dnssec.status to active to enable signing. Removing managed DNSSEC invokes provider deletion; coordinate parent DS removal first. | `bool` | `false` | no |
+| create\_zone | Whether to manage the zone itself. Requires zone\_name and account\_id; excludes zone\_id and zone\_filter. Import an existing zone before applying to adopt it. | `bool` | `false` | no |
+| defaults | Record defaults. Non-null per-record values override these; empty comments, empty tags, and empty settings explicitly override defaults. Settings are replaced as a whole. | ```object({ comment = optional(string) include_shadow_metadata = optional(bool) private_routing = optional(bool) proxied = optional(bool, false) tags = optional(set(string)) ttl = optional(number, 1) settings = optional(object({ flatten_cname = optional(bool) ipv4_only = optional(bool) ipv6_only = optional(bool) })) })``` | `{}` | no |
+| dns\_settings | Zone-wide DNS settings, requiring create\_dns\_settings = true. Null properties defer to the provider; false, zero, and empty nested objects are passed through. Zone mode and nameserver type are trimmed/lowercased. foundation\_dns is deprecated upstream; prefer nameservers.type. | ```object({ flatten_all_cnames = optional(bool) foundation_dns = optional(bool) multi_provider = optional(bool) ns_ttl = optional(number) secondary_overrides = optional(bool) zone_mode = optional(string) internal_dns = optional(object({ reference_zone_id = optional(string) })) nameservers = optional(object({ type = string ns_set = optional(number) nameserver_set_id = optional(string) })) soa = optional(object({ expire = optional(number) min_ttl = optional(number) mname = optional(string) refresh = optional(number) retry = optional(number) rname = optional(string) ttl = optional(number) })) })``` | `{}` | no |
+| dnssec | DNSSEC properties, requiring create\_dnssec = true. Status accepts active or disabled and is trimmed/lowercased. Null properties defer to the provider; explicit false values are preserved. Registrar or parent-zone DS publication is managed separately. | ```object({ status = optional(string) dnssec_multi_signer = optional(bool) dnssec_presigned = optional(bool) dnssec_use_nsec3 = optional(bool) })``` | `{}` | no |
+| load\_balancer\_monitors | Account-level health monitors keyed by stable identifiers. account\_id defaults to the module account\_id. Monitor type and HTTP method are normalized; bodies, paths, headers, and other settings pass through unchanged. | ```map(object({ account_id = optional(string) allow_insecure = optional(bool) consecutive_down = optional(number) consecutive_up = optional(number) description = optional(string) expected_body = optional(string) expected_codes = optional(string) follow_redirects = optional(bool) header = optional(map(list(string))) interval = optional(number) method = optional(string) path = optional(string) port = optional(number) probe_zone = optional(string) retries = optional(number) timeout = optional(number) type = optional(string) }))``` | `{}` | no |
+| load\_balancer\_pools | Account-level pools keyed by stable identifiers. Name defaults to the key; account\_id defaults to the module account\_id. Monitor accepts a managed monitor key or an existing ID. All configurable upstream properties are available. | ```map(object({ account_id = optional(string) check_regions = optional(list(string)) description = optional(string) enabled = optional(bool) health_sources = optional(list(string)) latitude = optional(number) load_shedding = optional(object({ default_percent = optional(number) default_policy = optional(string) session_percent = optional(number) session_policy = optional(string) })) longitude = optional(number) minimum_origins = optional(number) monitor = optional(string) monitor_group = optional(string) name = optional(string) notification_email = optional(string) notification_filter = optional(object({ origin = optional(object({ disable = optional(bool) healthy = optional(bool) })) pool = optional(object({ disable = optional(bool) healthy = optional(bool) })) })) origin_steering = optional(object({ policy = optional(string) })) origins = list(object({ address = optional(string) enabled = optional(bool) flatten_cname = optional(bool) header = optional(object({ host = optional(list(string)) })) name = optional(string) port = optional(number) virtual_network_id = optional(string) weight = optional(number) })) }))``` | `{}` | no |
+| load\_balancers | Load balancers keyed by stable identifiers. Names follow record name/full\_name rules. Pool references accept managed pool keys or existing IDs, including rule overrides and weight-map keys. Defaults to DNS-only (proxied = false); all upstream settings remain configurable. | ```map(object({ adaptive_routing = optional(object({ failover_across_pools = optional(bool) })) country_pools = optional(map(list(string))) default_pools = list(string) description = optional(string) enabled = optional(bool) fallback_pool = string location_strategy = optional(object({ mode = optional(string) prefer_ecs = optional(string) })) name = optional(string) networks = optional(list(string)) pop_pools = optional(map(list(string))) proxied = optional(bool, false) random_steering = optional(object({ default_weight = optional(number) pool_weights = optional(map(number)) })) region_pools = optional(map(list(string))) rules = optional(list(object({ condition = optional(string) disabled = optional(bool) fixed_response = optional(object({ content_type = optional(string) location = optional(string) message_body = optional(string) status_code = optional(number) })) name = optional(string) overrides = optional(object({ adaptive_routing = optional(object({ failover_across_pools = optional(bool) })) country_pools = optional(map(list(string))) default_pools = optional(list(string)) fallback_pool = optional(string) location_strategy = optional(object({ mode = optional(string) prefer_ecs = optional(string) })) pop_pools = optional(map(list(string))) random_steering = optional(object({ default_weight = optional(number) pool_weights = optional(map(number)) })) region_pools = optional(map(list(string))) session_affinity = optional(string) session_affinity_attributes = optional(object({ drain_duration = optional(number) headers = optional(list(string)) require_all_headers = optional(bool) samesite = optional(string) secure = optional(string) zero_downtime_failover = optional(string) })) session_affinity_ttl = optional(number) steering_policy = optional(string) ttl = optional(number) })) priority = optional(number) terminates = optional(bool) }))) session_affinity = optional(string) session_affinity_attributes = optional(object({ drain_duration = optional(number) headers = optional(list(string)) require_all_headers = optional(bool) samesite = optional(string) secure = optional(string) zero_downtime_failover = optional(string) })) session_affinity_ttl = optional(number) steering_policy = optional(string) ttl = optional(number) full_name = optional(string) }))``` | `{}` | no |
+| records | DNS records keyed by stable identifiers. Set name explicitly, or omit it to use the key. Content accepts a scalar or a list; MX list entries support a priority followed by a hostname. Supply exactly one of content or data. Full typed fields are defined in modules/record-inputs/variables.tf. | `any` | `{}` | no |
+| zone | Optional managed-zone properties. Only supported with create\_zone = true. Null values defer to the provider; an empty vanity\_name\_servers list explicitly clears custom nameservers. | ```object({ paused = optional(bool) type = optional(string) vanity_name_servers = optional(list(string)) })``` | `{}` | no |
+| zone\_filter | Complete cloudflare\_zone lookup filter. Must match exactly one zone. Mutually exclusive with zone\_id and zone\_name. Use filter.account for lookup filtering; account\_id can separately supply load balancing pools/monitors. Filter strings pass through unchanged. | ```object({ account = optional(object({ id = optional(string) name = optional(string) })) direction = optional(string) match = optional(string) name = optional(string) order = optional(string) status = optional(string) type = optional(list(string)) })``` | `null` | no |
+| zone\_id | Existing zone ID. Bypasses zone lookup; may be unknown until apply. Mutually exclusive with zone\_name, zone\_filter, and create\_zone. | `string` | `null` | no |
+| zone\_name | Zone name to create/manage when create\_zone is true, or look up otherwise. Mutually exclusive with zone\_id and zone\_filter. Use Punycode for internationalized names. | `string` | `null` | no |
 
 ## Outputs
 
 | Name | Description |
 | ---- | ----------- |
-| <a name="output_dns_settings"></a> [dns\_settings](#output\_dns\_settings) | Complete managed zone DNS settings, retaining all upstream fields. Null when DNS settings are unmanaged or the module is disabled. |
-| <a name="output_dnssec"></a> [dnssec](#output\_dnssec) | Complete managed DNSSEC resource, including status, signing settings, DS, digest, key metadata, and public key. Null when DNSSEC is unmanaged or the module is disabled. |
-| <a name="output_dnssec_ds"></a> [dnssec\_ds](#output\_dnssec\_ds) | Full DS record for publication through the registrar or parent zone. Null when DNSSEC is unmanaged or the module is disabled. Availability otherwise follows the provider. |
-| <a name="output_load_balancer_monitors"></a> [load\_balancer\_monitors](#output\_load\_balancer\_monitors) | Complete managed load balancer monitors keyed by the input keys, including computed properties. Empty when disabled or unconfigured. |
-| <a name="output_load_balancer_pools"></a> [load\_balancer\_pools](#output\_load\_balancer\_pools) | Complete managed load balancer pools keyed by the input keys, including computed properties. Empty when disabled or unconfigured. |
-| <a name="output_load_balancers"></a> [load\_balancers](#output\_load\_balancers) | Complete managed load balancers keyed by the input keys, including computed properties. Empty when disabled or unconfigured. |
-| <a name="output_name_servers"></a> [name\_servers](#output\_name\_servers) | Cloudflare-assigned nameservers for the managed or looked-up zone. Null in direct zone\_id mode or when disabled. Registrar delegation is managed separately. |
-| <a name="output_records"></a> [records](#output\_records) | Complete DNS resources keyed by the input key for scalar/structured entries, or key[index] for list content. Includes IDs, names, content, proxied (enabled), proxiable (capable), metadata, and timestamps. Empty when disabled. |
-| <a name="output_zone"></a> [zone](#output\_zone) | Complete managed zone or zone lookup result, preserving its upstream schema and computed properties. Null in direct zone\_id mode or when disabled. |
-| <a name="output_zone_id"></a> [zone\_id](#output\_zone\_id) | Target zone ID, or null when disabled. |
-| <a name="output_zone_name"></a> [zone\_name](#output\_zone\_name) | Normalized name of the managed or looked-up zone. Null in direct zone\_id mode or when disabled. |
+| dns\_settings | Complete managed zone DNS settings, retaining all upstream fields. Null when DNS settings are unmanaged or the module is disabled. |
+| dnssec | Complete managed DNSSEC resource, including status, signing settings, DS, digest, key metadata, and public key. Null when DNSSEC is unmanaged or the module is disabled. |
+| dnssec\_ds | Full DS record for publication through the registrar or parent zone. Null when DNSSEC is unmanaged or the module is disabled. Availability otherwise follows the provider. |
+| load\_balancer\_monitors | Complete managed load balancer monitors keyed by the input keys, including computed properties. Empty when disabled or unconfigured. |
+| load\_balancer\_pools | Complete managed load balancer pools keyed by the input keys, including computed properties. Empty when disabled or unconfigured. |
+| load\_balancers | Complete managed load balancers keyed by the input keys, including computed properties. Empty when disabled or unconfigured. |
+| name\_servers | Cloudflare-assigned nameservers for the managed or looked-up zone. Null in direct zone\_id mode or when disabled. Registrar delegation is managed separately. |
+| records | Complete DNS resources keyed by the input key for scalar/structured entries, or key[index] for list content. Includes IDs, names, content, proxied (enabled), proxiable (capable), metadata, and timestamps. Empty when disabled. |
+| zone | Complete managed zone or zone lookup result, preserving its upstream schema and computed properties. Null in direct zone\_id mode or when disabled. |
+| zone\_id | Target zone ID, or null when disabled. |
+| zone\_name | Normalized name of the managed or looked-up zone. Null in direct zone\_id mode or when disabled. |
 <!-- END_TF_DOCS -->
 
-### 🔃 Contributing
+## Contributing
 
-Refer to our [documentation for contributors][contributing] for contributing guidelines, commit message
-formats and versioning tips.
+See [CONTRIBUTING.md](docs/CONTRIBUTING.md) for contribution guidelines and
+[UPGRADING.md](docs/UPGRADING.md) for adoption and migration guidance.
+The generated [schema report](docs/SCHEMA.md) documents provider coverage.
 
-### 📥 Maintainers
+## Authors
 
-This project is owned and maintained by [Terraform Cloudflare Modules][org]. Refer to the [`AUTHORS`][authors] or [`CODEOWNERS`][owners]
-for more information. You may also use the linked contact details to reach out directly.
+Maintained by [Terraform Cloudflare Modules](https://github.com/terraform-cloudflare-modules).
+See [AUTHORS](.github/AUTHORS) and [CODEOWNERS](.github/CODEOWNERS).
 
-### ©️ Copyright
+## License
 
-- _Assets provided by:_ **[HashiCorp][hashicorp]**
-- _Sources provided by:_ **[Terraform Cloudflare Modules][org]** under the **[MIT License][license]**
-
-<!-- INTERNAL REFERENCES -->
-
-<!-- Project references -->
-
-<!-- File references -->
-
-[license]: LICENSE
-[contributing]: docs/CONTRIBUTING.md
-[authors]: .github/AUTHORS
-[owners]: .github/CODEOWNERS
-
-<!-- General links -->
-
-[org]: https://github.com/terraform-cloudflare-modules
-[terraform]: https://terraform.io
-[opentofu]: https://opentofu.org/
-[hashicorp]: https://www.hashicorp.com/
-[cloudflare]: https://cloudflare.com
-[github_releases]: https://github.com/terraform-cloudflare-modules/terraform-cloudflare-dns/releases
-[github_commits]: https://github.com/terraform-cloudflare-modules/terraform-cloudflare-dns/commits/main/
-
-<!-- Third-party -->
-
-[module]: https://registry.terraform.io/modules/terraform-cloudflare-modules/dns/cloudflare/latest
-[renovate]: https://renovatebot.com/
-[pre-commit]: https://pre-commit.com/
+MIT. See [LICENSE](LICENSE).

@@ -4,7 +4,14 @@ Manage account-level `cloudflare_dns_firewall` clusters independently of zone
 management. Each `clusters` entry opts into owning one cluster. An empty map or
 `create = false` creates no resources.
 
+## Usage
+
 ```hcl
+variable "account_id" {
+  description = "Account with DNS Firewall access."
+  type        = string
+}
+
 module "dns_firewall" {
   source = "terraform-cloudflare-modules/dns/cloudflare//modules/dns-firewall"
 
@@ -26,6 +33,11 @@ module "dns_firewall" {
   }
 }
 ```
+
+## Examples
+
+See the [full example](../../examples/modules/dns-firewall) for all inputs,
+composition with related resources, and prerequisites.
 
 ## Cluster behavior
 
@@ -61,10 +73,6 @@ infrastructure before removing an in-use cluster or handing off its ownership.
 
 ## Adoption and verification
 
-These submodules were added after v2.0.0. Use a local checkout containing them until
-a release includes them, then pin that release when using the Registry source.
-Provider configuration and credentials belong to the caller.
-
 When an existing resource is already managed in the same state, retain its ID with
 a caller-root move and remove the old declaration:
 
@@ -97,27 +105,51 @@ API behavior or account entitlements. Exercise creation, updates, a second
 no-change plan, and removal in a dedicated test account before production use.
 
 <!-- BEGIN_TF_DOCS -->
+## Requirements
+
+| Name | Version |
+| ---- | ------- |
+| terraform | >= 1.8 |
+| cloudflare | >= 5.28.0, < 6.0.0 |
+
 ## Providers
 
 | Name | Version |
 | ---- | ------- |
-| <a name="provider_cloudflare"></a> [cloudflare](#provider\_cloudflare) | >= 5.28.0, < 6.0.0 |
+| cloudflare | >= 5.28.0, < 6.0.0 |
 
-## Modules
+## Resources
 
-No modules.
+| Name | Type |
+| ---- | ---- |
+| [cloudflare_dns_firewall.this](https://registry.terraform.io/providers/cloudflare/cloudflare/latest/docs/resources/dns_firewall) | resource |
 
 ## Inputs
 
 | Name | Description | Type | Default | Required |
 | ---- | ----------- | ---- | ------- | :------: |
-| <a name="input_account_id"></a> [account\_id](#input\_account\_id) | Default account for managed entries. Individual entries can override it. | `string` | `null` | no |
-| <a name="input_clusters"></a> [clusters](#input\_clusters) | DNS Firewall clusters keyed by stable identifiers. Names default to keys; all upstream settings, including nested attack mitigation, are configurable. Null optional fields defer to the provider; explicit false, zero, and empty collections/objects pass through. | ```map(object({ account_id = optional(string) attack_mitigation = optional(object({ enabled = optional(bool) only_when_upstream_unhealthy = optional(bool) })) deprecate_any_requests = optional(bool) dns_firewall_ip_count = optional(number) ecs_fallback = optional(bool) maximum_cache_ttl = optional(number) minimum_cache_ttl = optional(number) name = optional(string) negative_cache_ttl = optional(number) ratelimit = optional(number) retries = optional(number) upstream_ips = set(string) }))``` | `{}` | no |
-| <a name="input_create"></a> [create](#input\_create) | Whether to manage resources in this submodule. Must be known at plan time. | `bool` | `true` | no |
+| account\_id | Default account for managed entries. Individual entries can override it. | `string` | `null` | no |
+| clusters | DNS Firewall clusters keyed by stable identifiers. Names default to keys; all upstream settings, including nested attack mitigation, are configurable. Null optional fields defer to the provider; explicit false, zero, and empty collections/objects pass through. | ```map(object({ account_id = optional(string) attack_mitigation = optional(object({ enabled = optional(bool) only_when_upstream_unhealthy = optional(bool) })) deprecate_any_requests = optional(bool) dns_firewall_ip_count = optional(number) ecs_fallback = optional(bool) maximum_cache_ttl = optional(number) minimum_cache_ttl = optional(number) name = optional(string) negative_cache_ttl = optional(number) ratelimit = optional(number) retries = optional(number) upstream_ips = set(string) }))``` | `{}` | no |
+| create | Whether to manage resources in this submodule. Must be known at plan time. | `bool` | `true` | no |
 
 ## Outputs
 
 | Name | Description |
 | ---- | ----------- |
-| <a name="output_clusters"></a> [clusters](#output\_clusters) | Complete managed clusters keyed by input keys, including computed properties. Empty when disabled or unconfigured. |
+| clusters | Complete managed clusters keyed by input keys, including computed properties. Empty when disabled or unconfigured. |
 <!-- END_TF_DOCS -->
+
+## Contributing
+
+See [CONTRIBUTING.md](../../docs/CONTRIBUTING.md) for contribution guidelines and
+[UPGRADING.md](../../docs/UPGRADING.md) for adoption and migration guidance.
+The generated [schema report](docs/SCHEMA.md) documents provider coverage.
+
+## Authors
+
+Maintained by [Terraform Cloudflare Modules](https://github.com/terraform-cloudflare-modules).
+See [AUTHORS](../../.github/AUTHORS) and [CODEOWNERS](../../.github/CODEOWNERS).
+
+## License
+
+MIT. See [LICENSE](../../LICENSE).

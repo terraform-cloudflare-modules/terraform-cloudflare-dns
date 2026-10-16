@@ -4,7 +4,19 @@ Manage reusable `cloudflare_load_balancer_monitor_group` resources independently
 of zones, pools, and monitors. Each `groups` entry opts into owning one group.
 An empty map or `create = false` creates no resources.
 
+## Usage
+
 ```hcl
+variable "account_id" {
+  description = "Account with monitor-group access."
+  type        = string
+}
+
+variable "api_monitor_id" {
+  description = "Existing health monitor in this account."
+  type        = string
+}
+
 module "monitor_groups" {
   source = "terraform-cloudflare-modules/dns/cloudflare//modules/monitor-groups"
 
@@ -22,6 +34,11 @@ module "monitor_groups" {
   }
 }
 ```
+
+## Examples
+
+See the [full example](../../examples/modules/monitor-groups) for all inputs,
+composition with related resources, and prerequisites.
 
 ## Membership and reuse
 
@@ -57,10 +74,6 @@ membership, while removing the map entry destroys the group.
 
 ## Adoption and verification
 
-These submodules were added after v2.0.0. Use a local checkout containing them until
-a release includes them, then pin that release when using the Registry source.
-Provider configuration and credentials belong to the caller.
-
 When an existing resource is already managed in the same state, retain its ID with
 a caller-root move and remove the old declaration:
 
@@ -93,27 +106,51 @@ API behavior or account entitlements. Exercise creation, updates, a second
 no-change plan, and removal in a dedicated test account before production use.
 
 <!-- BEGIN_TF_DOCS -->
+## Requirements
+
+| Name | Version |
+| ---- | ------- |
+| terraform | >= 1.8 |
+| cloudflare | >= 5.28.0, < 6.0.0 |
+
 ## Providers
 
 | Name | Version |
 | ---- | ------- |
-| <a name="provider_cloudflare"></a> [cloudflare](#provider\_cloudflare) | >= 5.28.0, < 6.0.0 |
+| cloudflare | >= 5.28.0, < 6.0.0 |
 
-## Modules
+## Resources
 
-No modules.
+| Name | Type |
+| ---- | ---- |
+| [cloudflare_load_balancer_monitor_group.this](https://registry.terraform.io/providers/cloudflare/cloudflare/latest/docs/resources/load_balancer_monitor_group) | resource |
 
 ## Inputs
 
 | Name | Description | Type | Default | Required |
 | ---- | ----------- | ---- | ------- | :------: |
-| <a name="input_account_id"></a> [account\_id](#input\_account\_id) | Default account for managed entries. Individual entries can override it. | `string` | `null` | no |
-| <a name="input_create"></a> [create](#input\_create) | Whether to manage resources in this submodule. Must be known at plan time. | `bool` | `true` | no |
-| <a name="input_groups"></a> [groups](#input\_groups) | Reusable monitor groups keyed by stable identifiers. Each member supplies a monitor ID and all required health flags. Members are unordered; false flags, empty descriptions, and empty member sets pass through for provider validation. | ```map(object({ account_id = optional(string) description = string members = set(object({ enabled = bool monitor_id = string monitoring_only = bool must_be_healthy = bool })) }))``` | `{}` | no |
+| account\_id | Default account for managed entries. Individual entries can override it. | `string` | `null` | no |
+| create | Whether to manage resources in this submodule. Must be known at plan time. | `bool` | `true` | no |
+| groups | Reusable monitor groups keyed by stable identifiers. Each member supplies a monitor ID and all required health flags. Members are unordered; false flags, empty descriptions, and empty member sets pass through for provider validation. | ```map(object({ account_id = optional(string) description = string members = set(object({ enabled = bool monitor_id = string monitoring_only = bool must_be_healthy = bool })) }))``` | `{}` | no |
 
 ## Outputs
 
 | Name | Description |
 | ---- | ----------- |
-| <a name="output_groups"></a> [groups](#output\_groups) | Complete managed groups keyed by input keys, including computed properties. Empty when disabled or unconfigured. |
+| groups | Complete managed groups keyed by input keys, including computed properties. Empty when disabled or unconfigured. |
 <!-- END_TF_DOCS -->
+
+## Contributing
+
+See [CONTRIBUTING.md](../../docs/CONTRIBUTING.md) for contribution guidelines and
+[UPGRADING.md](../../docs/UPGRADING.md) for adoption and migration guidance.
+The generated [schema report](docs/SCHEMA.md) documents provider coverage.
+
+## Authors
+
+Maintained by [Terraform Cloudflare Modules](https://github.com/terraform-cloudflare-modules).
+See [AUTHORS](../../.github/AUTHORS) and [CODEOWNERS](../../.github/CODEOWNERS).
+
+## License
+
+MIT. See [LICENSE](../../LICENSE).

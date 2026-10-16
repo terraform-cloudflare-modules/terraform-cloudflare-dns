@@ -1,9 +1,13 @@
 module "dns_firewall" {
   source = "../../../modules/dns-firewall"
 
+  create = true
+
   account_id = var.account_id
   clusters = {
     authoritative = {
+      account_id             = var.account_id # Overrides the module default.
+      ratelimit              = 1000
       name                   = "External authoritative DNS"
       upstream_ips           = ["192.0.2.1", "192.0.2.2"]
       dns_firewall_ip_count  = 2

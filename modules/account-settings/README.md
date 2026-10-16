@@ -4,7 +4,14 @@ Manage `cloudflare_account_dns_settings` once per account, independently of any
 zone module instance. An enabled call manages one settings resource; `account_id`
 is required. `create = false` produces no resource and a null `settings` output.
 
+## Usage
+
 ```hcl
+variable "account_id" {
+  description = "Account whose DNS defaults are managed."
+  type        = string
+}
+
 module "account_settings" {
   source = "terraform-cloudflare-modules/dns/cloudflare//modules/account-settings"
 
@@ -20,6 +27,11 @@ module "account_settings" {
   }
 }
 ```
+
+## Examples
+
+See the [full example](../../examples/modules/account-settings) for all inputs,
+composition with related resources, and prerequisites.
 
 ## Account behavior
 
@@ -54,10 +66,6 @@ handing off ownership, and review the provider's removal behavior.
 [defaults]: https://developers.cloudflare.com/dns/additional-options/dns-zone-defaults/
 
 ## Adoption and verification
-
-These submodules were added after v2.0.0. Use a local checkout containing them until
-a release includes them, then pin that release when using the Registry source.
-Provider configuration and credentials belong to the caller.
 
 When an existing resource is already managed in the same state, retain its ID with
 a caller-root move and remove the old declaration:
@@ -95,27 +103,51 @@ The current Formr analysis labels results behind `one(...)` as unused. The
 and null behavior when disabled.
 
 <!-- BEGIN_TF_DOCS -->
+## Requirements
+
+| Name | Version |
+| ---- | ------- |
+| terraform | >= 1.8 |
+| cloudflare | >= 5.28.0, < 6.0.0 |
+
 ## Providers
 
 | Name | Version |
 | ---- | ------- |
-| <a name="provider_cloudflare"></a> [cloudflare](#provider\_cloudflare) | >= 5.28.0, < 6.0.0 |
+| cloudflare | >= 5.28.0, < 6.0.0 |
 
-## Modules
+## Resources
 
-No modules.
+| Name | Type |
+| ---- | ---- |
+| [cloudflare_account_dns_settings.this](https://registry.terraform.io/providers/cloudflare/cloudflare/latest/docs/resources/account_dns_settings) | resource |
 
 ## Inputs
 
 | Name | Description | Type | Default | Required |
 | ---- | ----------- | ---- | ------- | :------: |
-| <a name="input_account_id"></a> [account\_id](#input\_account\_id) | Account to manage. Required when create is true. | `string` | `null` | no |
-| <a name="input_create"></a> [create](#input\_create) | Whether to manage resources in this submodule. Must be known at plan time. | `bool` | `true` | no |
-| <a name="input_settings"></a> [settings](#input\_settings) | Account-wide DNS enforcement and defaults for newly created zones. Null optional fields defer to the provider; explicit false, zero, and empty collections/objects pass through. | ```object({ enforce_dns_only = optional(bool) zone_defaults = optional(object({ flatten_all_cnames = optional(bool) foundation_dns = optional(bool) internal_dns = optional(object({ reference_zone_id = optional(string) })) multi_provider = optional(bool) nameservers = optional(object({ type = optional(string) })) ns_ttl = optional(number) secondary_overrides = optional(bool) soa = optional(object({ expire = optional(number) min_ttl = optional(number) mname = optional(string) refresh = optional(number) retry = optional(number) rname = optional(string) ttl = optional(number) })) zone_mode = optional(string) })) })``` | `{}` | no |
+| account\_id | Account to manage. Required when create is true. | `string` | `null` | no |
+| create | Whether to manage resources in this submodule. Must be known at plan time. | `bool` | `true` | no |
+| settings | Account-wide DNS enforcement and defaults for newly created zones. Null optional fields defer to the provider; explicit false, zero, and empty collections/objects pass through. | ```object({ enforce_dns_only = optional(bool) zone_defaults = optional(object({ flatten_all_cnames = optional(bool) foundation_dns = optional(bool) internal_dns = optional(object({ reference_zone_id = optional(string) })) multi_provider = optional(bool) nameservers = optional(object({ type = optional(string) })) ns_ttl = optional(number) secondary_overrides = optional(bool) soa = optional(object({ expire = optional(number) min_ttl = optional(number) mname = optional(string) refresh = optional(number) retry = optional(number) rname = optional(string) ttl = optional(number) })) zone_mode = optional(string) })) })``` | `{}` | no |
 
 ## Outputs
 
 | Name | Description |
 | ---- | ----------- |
-| <a name="output_settings"></a> [settings](#output\_settings) | Complete account DNS settings, or null when disabled. |
+| settings | Complete account DNS settings, or null when disabled. |
 <!-- END_TF_DOCS -->
+
+## Contributing
+
+See [CONTRIBUTING.md](../../docs/CONTRIBUTING.md) for contribution guidelines and
+[UPGRADING.md](../../docs/UPGRADING.md) for adoption and migration guidance.
+The generated [schema report](docs/SCHEMA.md) documents provider coverage.
+
+## Authors
+
+Maintained by [Terraform Cloudflare Modules](https://github.com/terraform-cloudflare-modules).
+See [AUTHORS](../../.github/AUTHORS) and [CODEOWNERS](../../.github/CODEOWNERS).
+
+## License
+
+MIT. See [LICENSE](../../LICENSE).
